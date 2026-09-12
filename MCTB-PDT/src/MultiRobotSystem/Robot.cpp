@@ -77,3 +77,15 @@ uint16_t Robot::getUpdatedTime(uint16_t currentTime, const Point& targetPosition
     uint16_t travelTime = static_cast<uint16_t>(distance / velo);
     return currentTime + travelTime;
 }
+
+/**
+ * getTravelTime - Calculate the travel time for the robot to move from a start position to a target position
+ * This is a simple heuristic based on Manhattan distance and velocity. It can be enhanced with more complex pathfinding if needed.
+ */
+uint16_t Robot::getTravelTime(const Point& startPosition, const Point& targetPosition) const {
+    // Calculate Manhattan distance from start position to target position
+    uint16_t distance = startPosition.distance(targetPosition);
+    // Calculate time based on velocity
+    uint16_t travelTime = static_cast<uint16_t>(distance / velo);
+    return travelTime;
+}

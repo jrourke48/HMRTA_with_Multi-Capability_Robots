@@ -60,6 +60,17 @@ void MultiRobotSystem::clear() {
     robots.clear();
     numRobots = 0;  // Update the count of robots
 }
+/**
+ * getRobotCapabilities - Get the capabilities of a specific robot
+ */
+std::vector<bool> MultiRobotSystem::getRobotCapabilities(uint8_t robotId) const {
+    for (auto* robot : robots) {
+        if (robot->getRobotId() == robotId) {
+            return robot->getCapabilities();
+        }
+    }
+    return {};
+}
 
 /**
  * getRobotsWithCapability - Get all robots that have a specific capability

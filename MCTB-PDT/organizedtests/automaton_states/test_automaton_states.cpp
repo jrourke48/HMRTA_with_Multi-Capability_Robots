@@ -133,11 +133,35 @@ int main() {
                 // Create TaskAllocationAlgorithms
                 TaskAllocationAlgorithms* allocAlg = new TaskAllocationAlgorithms(buchi, env, mrs);
                 
-                // Measure memory and time
+                // Measure memory 
                 double memBefore = getMemoryUsageMB();
                 //build the planning decision tree
                 allocAlg->intensiveInterTaskRelationshipTreeSearch(buchi, env, mrs);
-                cout << "✓ Complete\n";
+                double memAfter = getMemoryUsageMB();
+                double memUsed = memAfter - memBefore;
+                allocAlg->getMetrics().setTaskMemoryUsageMB(memUsed);
+                bool shouldSkip = (robotCount > 10) && (buchi->getNumStates()*std::pow(ts->getNumStates(), robotCount) > UINT16_MAX/2);
+                if (!shouldSkip) {
+                    //buld the product automaton and store its metrics
+                    double memBeforeProduct = getMemoryUsageMB();
+                    double startTimeProduct = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+                    ProductAutomaton* product = new ProductAutomaton(*env, *mrs, *buchi);
+                    double memAfterProduct = getMemoryUsageMB();
+                    double endTimeProduct = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+                    double memUsedProduct = memAfterProduct - memBeforeProduct;
+                    //add the full product automaton metrics to the algorithm metrics
+                    allocAlg->getMetrics().setFullProductAutomatonMetrics(
+                        product->getNumStates(),
+                        product->getNumEdges(),
+                        0,
+                        (endTimeProduct - startTimeProduct) / 1e6,  // convert from nanoseconds to milliseconds
+                        memUsedProduct
+                    );
+                    // Compute derived metrics after setting full product automaton metrics
+                    allocAlg->getMetrics().computeDerivedMetrics();
+                    delete product;  // Clean up the product automaton after storing its metrics
+                }
+
                 allocAlg->getMetrics().printSummary();
                 
                 // Store run in TestRunManager
@@ -622,48 +646,36 @@ void createTestEnvironment6(TS*& ts, GridWorld*& grid, Environment*& env, MultiR
     cout << "✓ Environment created" << endl;
     
     // Map states to grid regions
-    env->mapTSStateToGrid(0, Point(18, 14), 5, 14);    // State 0 centered at (17,15), 4x6 region
-    env->mapTSStateToGrid(1, Point(18, 4), 5, 7);   // State 1 centered at (17,4)
-    env->mapTSStateToGrid(2, Point(10, 10), 6, 20);   // State 2 centered at (10,11)
-    env->mapTSStateToGrid(3, Point(5, 3), 5, 18);   // State 3 centered at (5,5)
-    env->mapTSStateToGrid(4, Point(5, 10), 5, 11);   // State 4 centered at (5,10)
-    env->mapTSStateToGrid(5, Point(5, 15), 5, 4);   // State 5 centered at (5,15)
+    env->mapTSStateToGrid(0, Point(180, 140), 60, 140);    // State 0 centered at (180,140)
+    env->mapTSStateToGrid(1, Point(180, 35), 60, 70);   // State 1 centered at (180,40)
+    env->mapTSStateToGrid(2, Point(120, 105), 60, 210);   // State 2 centered at (100,100)
+    env->mapTSStateToGrid(3, Point(45, 35), 90, 70);   // State 3 centered at (50,30)
+    env->mapTSStateToGrid(4, Point(45, 105), 90, 70);   // State 4 centered at (50,100)
+    env->mapTSStateToGrid(5, Point(45, 175), 90, 70);   // State 5 centered at (50,150)
     cout << "✓ Mapped 6 states to grid regions" << endl;
     
-    // Create MultiRobotSystem
+    // Create MultiRobotSystem with 6 robots
     mrs = new MultiRobotSystem();
     
-    // Position all robots in room 0 (centered at Point(18, 14))
-    Robot* r1 = new Robot(1, "Rover_1", Point(18, 14));
-    r1->initializeCapabilities(13);
-    r1->enableCapability(RobotCapability::SENSOR_GPS); //C
-    mrs->addRobot(r1);
-    
-    Robot* r2 = new Robot(2, "Rover_2", Point(17, 14));
-    r2->initializeCapabilities(13);
-    r2->enableCapability(RobotCapability::MOVEMENT_GROUND); //A
-    mrs->addRobot(r2);
-    
-    Robot* r3 = new Robot(3, "Rover_3", Point(19, 14));
-    r3->initializeCapabilities(13);
-    r3->enableCapability(RobotCapability::SENSOR_CAMERA); // B
-    mrs->addRobot(r3);
-    Robot* r4 = new Robot(4, "Rover_4", Point(18, 13));
-    r4->initializeCapabilities(13);
-    r4->enableCapability(RobotCapability::SENSOR_GPS); // C
-    mrs->addRobot(r4);
-    
-    Robot* r5 = new Robot(5, "Rover_5", Point(18, 15));
-    r5->initializeCapabilities(13);
-    r5->enableCapability(RobotCapability::MOVEMENT_GROUND);
-    mrs->addRobot(r5);
-    
-    Robot* r6 = new Robot(6, "Rover_6", Point(17, 15));
-    r6->initializeCapabilities(13);
-    r6->enableCapability(RobotCapability::SENSOR_CAMERA);
-    mrs->addRobot(r6);
-    
-    cout << "✓ MultiRobotSystem created with 6 robots" << endl;
+    // Position 15 robots in a 3x2 grid, directly adjacent (1-unit spacing)
+    // Grid starts at (160, 80) in room 0
+    for (int i = 1; i <= 6; i++) {
+        int col = (i - 1) % 3;  // 0-2 horizontal
+        int row = (i - 1) / 3;  // 0-4 vertical
+        int x = 160 + col;
+        int y = 80 + row;
+        
+        // Rotate capabilities: GPS, MOVEMENT_GROUND, SENSOR_CAMERA
+        RobotCapability cap = (i % 3 == 1) ? RobotCapability::SENSOR_GPS : 
+                              (i % 3 == 2) ? RobotCapability::MOVEMENT_GROUND : 
+                              RobotCapability::SENSOR_CAMERA;
+        
+        Robot* r = new Robot(i, "Rover_" + to_string(i), Point(x, y));
+        r->initializeCapabilities(13);
+        r->enableCapability(cap);
+        mrs->addRobot(r);
+    }
+    cout << "✓ MultiRobotSystem created with 6 robots in a 3x2 grid" << endl;
 }
 
 // ============================================================================
@@ -714,33 +726,35 @@ void createTestEnvironment3(TS*& ts, GridWorld*& grid, Environment*& env, MultiR
     cout << "✓ Environment created" << endl;
     
     // Map states to grid regions
-    env->mapTSStateToGrid(0, Point(180, 140), 50, 140);    // State 0 centered at (180,140)
-    env->mapTSStateToGrid(1, Point(180, 40), 50, 70);   // State 1 centered at (180,40)
-    env->mapTSStateToGrid(2, Point(100, 100), 60, 200);   // State 2 centered at (100,100)
-    env->mapTSStateToGrid(3, Point(50, 30), 50, 180);   // State 3 centered at (50,30)
-    env->mapTSStateToGrid(4, Point(50, 100), 50, 110);   // State 4 centered at (50,100)
-    env->mapTSStateToGrid(5, Point(50, 150), 50, 40);   // State 5 centered at (50,150)
+    env->mapTSStateToGrid(0, Point(180, 140), 60, 140);    // State 0 centered at (180,140)
+    env->mapTSStateToGrid(1, Point(180, 35), 60, 70);   // State 1 centered at (180,40)
+    env->mapTSStateToGrid(2, Point(120, 105), 60, 210);   // State 2 centered at (100,100)
+    env->mapTSStateToGrid(3, Point(45, 35), 90, 70);   // State 3 centered at (50,30)
+    env->mapTSStateToGrid(4, Point(45, 105), 90, 70);   // State 4 centered at (50,100)
+    env->mapTSStateToGrid(5, Point(45, 175), 90, 70);   // State 5 centered at (50,150)
     cout << "✓ Mapped 6 states to grid regions" << endl;
     
-    // Create MultiRobotSystem
+    // Create MultiRobotSystem with 15 robots
     mrs = new MultiRobotSystem();
     
-    // Position all robots in room 0 (centered at Point(180, 140))
-    Robot* r1 = new Robot(1, "Rover_1", Point(180, 140));
-    r1->initializeCapabilities(13);
-    r1->enableCapability(RobotCapability::SENSOR_GPS); //C
-    mrs->addRobot(r1);
-    
-    Robot* r2 = new Robot(2, "Rover_2", Point(170, 140));
-    r2->initializeCapabilities(13);
-    r2->enableCapability(RobotCapability::MOVEMENT_GROUND); //A
-    mrs->addRobot(r2);
-    
-    Robot* r3 = new Robot(3, "Rover_3", Point(190, 140));
-    r3->initializeCapabilities(13);
-    r3->enableCapability(RobotCapability::SENSOR_CAMERA); // B
-    mrs->addRobot(r3);
-    
+    // Position 3 robots in a 3x1 grid, directly adjacent (1-unit spacing)
+    // Grid starts at (160, 80) in room 0
+    for (int i = 1; i <= 3; i++) {
+        int col = (i - 1) % 3;  // 0-2 horizontal
+        int row = (i - 1) / 3;  // 0 vertical
+        int x = 160 + col;
+        int y = 80 + row;
+        
+        // Rotate capabilities: GPS, MOVEMENT_GROUND, SENSOR_CAMERA
+        RobotCapability cap = (i % 3 == 1) ? RobotCapability::SENSOR_GPS : 
+                              (i % 3 == 2) ? RobotCapability::MOVEMENT_GROUND : 
+                              RobotCapability::SENSOR_CAMERA;
+        
+        Robot* r = new Robot(i, "Rover_" + to_string(i), Point(x, y));
+        r->initializeCapabilities(13);
+        r->enableCapability(cap);
+        mrs->addRobot(r);
+    }
     
     cout << "✓ MultiRobotSystem created with 3 robots" << endl;
 }
@@ -793,24 +807,24 @@ void createTestEnvironment15(TS*& ts, GridWorld*& grid, Environment*& env, Multi
     cout << "✓ Environment created" << endl;
     
     // Map states to grid regions
-    env->mapTSStateToGrid(0, Point(180, 140), 50, 140);    // State 0 centered at (180,140)
-    env->mapTSStateToGrid(1, Point(180, 40), 50, 70);   // State 1 centered at (180,40)
-    env->mapTSStateToGrid(2, Point(100, 100), 60, 200);   // State 2 centered at (100,100)
-    env->mapTSStateToGrid(3, Point(50, 30), 50, 180);   // State 3 centered at (50,30)
-    env->mapTSStateToGrid(4, Point(50, 100), 50, 110);   // State 4 centered at (50,100)
-    env->mapTSStateToGrid(5, Point(50, 150), 50, 40);   // State 5 centered at (50,150)
+    env->mapTSStateToGrid(0, Point(180, 140), 60, 140);    // State 0 centered at (180,140)
+    env->mapTSStateToGrid(1, Point(180, 35), 60, 70);   // State 1 centered at (180,40)
+    env->mapTSStateToGrid(2, Point(120, 105), 60, 210);   // State 2 centered at (100,100)
+    env->mapTSStateToGrid(3, Point(45, 35), 90, 70);   // State 3 centered at (50,30)
+    env->mapTSStateToGrid(4, Point(45, 105), 90, 70);   // State 4 centered at (50,100)
+    env->mapTSStateToGrid(5, Point(45, 175), 90, 70);   // State 5 centered at (50,150)
     cout << "✓ Mapped 6 states to grid regions" << endl;
     
     // Create MultiRobotSystem with 15 robots
     mrs = new MultiRobotSystem();
     
     // Position 15 robots in a 3x5 grid, directly adjacent (1-unit spacing)
-    // Grid starts at (140, 120) in room 0
+    // Grid starts at (160, 80) in room 0
     for (int i = 1; i <= 15; i++) {
         int col = (i - 1) % 3;  // 0-2 horizontal
         int row = (i - 1) / 3;  // 0-4 vertical
-        int x = 140 + col;
-        int y = 120 + row;
+        int x = 160 + col;
+        int y = 80 + row;
         
         // Rotate capabilities: GPS, MOVEMENT_GROUND, SENSOR_CAMERA
         RobotCapability cap = (i % 3 == 1) ? RobotCapability::SENSOR_GPS : 
@@ -875,24 +889,24 @@ void createTestEnvironment45(TS*& ts, GridWorld*& grid, Environment*& env, Multi
     cout << "✓ Environment created" << endl;
     
     // Map states to grid regions
-    env->mapTSStateToGrid(0, Point(180, 140), 50, 140);    // State 0 centered at (180,140)
-    env->mapTSStateToGrid(1, Point(180, 40), 50, 70);   // State 1 centered at (180,40)
-    env->mapTSStateToGrid(2, Point(100, 100), 60, 200);   // State 2 centered at (100,100)
-    env->mapTSStateToGrid(3, Point(50, 30), 50, 180);   // State 3 centered at (50,30)
-    env->mapTSStateToGrid(4, Point(50, 100), 50, 110);   // State 4 centered at (50,100)
-    env->mapTSStateToGrid(5, Point(50, 150), 50, 40);   // State 5 centered at (50,150)
+    env->mapTSStateToGrid(0, Point(180, 140), 60, 140);    // State 0 centered at (180,140)
+    env->mapTSStateToGrid(1, Point(180, 35), 60, 70);   // State 1 centered at (180,40)
+    env->mapTSStateToGrid(2, Point(120, 105), 60, 210);   // State 2 centered at (100,100)
+    env->mapTSStateToGrid(3, Point(45, 35), 90, 70);   // State 3 centered at (50,30)
+    env->mapTSStateToGrid(4, Point(45, 105), 90, 70);   // State 4 centered at (50,100)
+    env->mapTSStateToGrid(5, Point(45, 175), 90, 70);   // State 5 centered at (50,150)
     cout << "✓ Mapped 6 states to grid regions" << endl;
     
-    // Create MultiRobotSystem with 45 robots
+    // Create MultiRobotSystem with 15 robots
     mrs = new MultiRobotSystem();
     
-    // Position 45 robots in a 9x5 grid, all in room 0
-    // Grid starts at (135, 120), directly adjacent (1-unit spacing)
+    // Position 45 robots in a 3x15 grid, directly adjacent (1-unit spacing)
+    // Grid starts at (160, 80) in room 0
     for (int i = 1; i <= 45; i++) {
-        int col = (i - 1) % 9;  // 0-8 horizontal
-        int row = (i - 1) / 9;  // 0-4 vertical
-        int x = 135 + col;
-        int y = 120 + row;
+        int col = (i - 1) % 3;  // 0-2 horizontal
+        int row = (i - 1) / 3;  // 0-14 vertical
+        int x = 160 + col;
+        int y = 80 + row;
         
         // Rotate capabilities: GPS, MOVEMENT_GROUND, SENSOR_CAMERA
         RobotCapability cap = (i % 3 == 1) ? RobotCapability::SENSOR_GPS : 

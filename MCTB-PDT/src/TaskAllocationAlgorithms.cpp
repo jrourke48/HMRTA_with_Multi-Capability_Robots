@@ -311,6 +311,7 @@ PlanningDecisionTree* TaskAllocationAlgorithms::intensiveInterTaskRelationshipTr
     for (Tree_Node* node : pruningResult) {
             addUntraversedPlanningNode(node);
     }
+
     // Add non-pruned nodes to the main planning tree as children of currentNode
     planningTree->insertNodes(currentNode, pruningResult);
     }

@@ -73,7 +73,7 @@ int main() {
         for (uint16_t i = 0; i < buchi2->getNumStates(); i++) {
             Node* node = buchi2->getNode(i);
             if (node) {
-                std::cout << "    Node " << i << ": " << node->to_string() << std::endl;
+                std::cout << "    Node " << i << ": " << node->to_String() << std::endl;
             } else {
                 std::cout << "    Node " << i << ": (null)" << std::endl;
             }
