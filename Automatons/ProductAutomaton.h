@@ -3,6 +3,7 @@
 
 #include "Automaton.h"
 #include "TS.h"
+#include "Environment/Environment.h"
 #include "BuchiAutomaton.h"
 #include "MultiRobotSystem/MultiRobotSystem.h"
 #include <cstdint>
@@ -23,6 +24,7 @@ private:
     
     // DOT parsing helper methods
     void parseProductFromDot(const std::string& dotContent);
+    void parseProductFromDot(const std::string& dotContent, const Environment& env, const MultiRobotSystem& mrs);
     std::string extractLabelFromDotBrackets(const std::string& content) const;
 public:
     ProductAutomaton();
@@ -31,10 +33,10 @@ public:
     ProductAutomaton(spot::twa_graph_ptr spotAutomaton);
 
     //Constructor from individual components (TS, Mult-Robot System, and automaton states)
-    ProductAutomaton(const TS& ts, const MultiRobotSystem& mrs, const BuchiAutomaton& buchiAutomaton);
+    ProductAutomaton(const Environment& env, const MultiRobotSystem& mrs, const BuchiAutomaton& buchiAutomaton);
     
     // Compute the optimal accepting path starting from the given state
-    std::vector<uint16_t> OptimalAcceptingPath(uint16_t startState);
+    std::vector<uint16_t> OptimalAcceptingPath();
     
     ~ProductAutomaton() override;
 
@@ -46,7 +48,9 @@ public:
     bool isAccepting(uint16_t stateId) const;
     const std::vector<uint16_t>& getAcceptingStates() const;
 
+
     // Product-specific methods
+    void initCartesianStateMapping(std::vector<std::vector<uint16_t>> cartesianStates);
     void addStateMapping(uint16_t productState, const std::string& label);
     void initStateMapping(const std::string& dotContent);
     void updateStateMapping(const std::string& dotContent);
@@ -57,6 +61,7 @@ public:
     std::string replaceLabel(const std::string& oldLabel, const std::string& additionalLabel);
     // Getter for Spot automaton
     spot::twa_graph_ptr getSpotAutomaton() const { return spotAutomaton; }
+    uint32_t getEdgeWeight(Node* srcNode, Node* dstNode, const Environment& env, const MultiRobotSystem& mrs) const;
 };
 
 #endif

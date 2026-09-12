@@ -25,7 +25,7 @@
 class BuchiAutomaton : public Automaton {
 private:
     std::vector<uint16_t> acceptingStates;  // Set of accepting states (Büchi accepting states)
-    const LTLFormula* ltlFormula;  // LTL formula associated with the Büchi automaton (externally owned)
+    LTLFormula* ltlFormula;  // LTL formula associated with the Büchi automaton (externally owned)
     spot::twa_graph_ptr spotAutomaton;  // Store the Spot automaton for visualization
     uint16_t initialState;  // Initial state of the Büchi automaton
     bool isInfiniteFlag;  // Flag indicating if the automaton is infinite (GBA)
@@ -33,7 +33,7 @@ private:
 
 public:
     // Constructor that takes a pointer to an LTL formula object (externally owned)
-    BuchiAutomaton(const LTLFormula* formula) : ltlFormula(formula), isInfiniteFlag(false) {
+    BuchiAutomaton(LTLFormula* formula) : ltlFormula(formula), isInfiniteFlag(false) {
         try {
             // Extract spot formula from LTLFormula and build automaton
             spot::translator trans;
@@ -311,7 +311,10 @@ public:
     const LTLFormula* getLTLFormula() const {
         return ltlFormula;
     };
-
+    //method to get a mutable pointer to the LTLFormula object
+    LTLFormula* getLTLFormula() {
+        return ltlFormula;
+    }
     // Method to get the Spot automaton object
     spot::twa_graph_ptr getSpotAutomaton() const {
         return spotAutomaton;

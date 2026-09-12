@@ -5,6 +5,25 @@
 TS::TS() {
 }
 
+// Deep copy constructor
+TS::TS(const TS& other) 
+    : initialStates(other.initialStates), 
+      stateToNodeId(other.stateToNodeId) {
+    // Copy numNodes and numEdges from parent
+    numNodes = other.numNodes;
+    numEdges = other.numEdges;
+    
+    // Deep copy all nodes in nodeMap
+    for (const auto& pair : other.nodeMap) {
+        uint16_t nodeId = pair.first;
+        const Node* srcNode = pair.second;
+        
+        // Create a new Node that's a copy of the source node
+        Node* newNode = new Node(*srcNode);
+        nodeMap[nodeId] = newNode;
+    }
+}
+
 TS::~TS() {
     // Clean up dynamically allocated nodes
     for (auto& pair : nodeMap) {
@@ -23,6 +42,14 @@ void TS::add_Node(Node* node) {
     
     // Increment node count
     numNodes++;
+}
+void TS::removeNode(uint16_t nodeId) {
+    auto it = nodeMap.find(nodeId);
+    if (it != nodeMap.end()) {
+        delete it->second;
+        nodeMap.erase(it);
+        numNodes--;
+    }
 }
 
 bool TS::isAdjacent(uint16_t srcId, uint16_t dstId) const {

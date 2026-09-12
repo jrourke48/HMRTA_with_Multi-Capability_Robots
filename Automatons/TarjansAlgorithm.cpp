@@ -98,31 +98,3 @@ vector<vector<int>> getSCCs(vector<vector<int>> &adj) {
 
     return allSCCs;
 }
-
-int main() {
-
-    int n = 6;
-    vector<vector<int>> adj(n);
-
-    // Graph construction
-    adj[0].push_back(1);
-    adj[1].push_back(2);
-    adj[2].push_back(0);
-    adj[2].push_back(3);
-    adj[3].push_back(4);
-    adj[4].push_back(3);
-    adj[4].push_back(5);
-
-    vector<vector<int>> sccs = getSCCs(adj);
-
-    cout << "Strongly Connected Components:\n";
-
-    for (auto &scc : sccs) {
-        for (int node : scc) {
-            cout << node << " ";
-        }
-        cout << "\n";
-    }
-
-    return 0;
-}
