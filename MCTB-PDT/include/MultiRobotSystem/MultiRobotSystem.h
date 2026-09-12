@@ -29,6 +29,8 @@ public:
     uint8_t getNumRobots() const { return numRobots; }
     
     // Capability queries
+    std::vector<bool> getRobotCapabilities(uint8_t robotId) const;
+    
     std::vector<Robot*> getRobotsWithCapability(RobotCapability cap) const;
     std::vector<uint8_t> getRobotIdsWithCapability(RobotCapability cap) const;
     bool hasRobotWithCapability(RobotCapability cap) const;

@@ -50,6 +50,7 @@ public:
 
     //get updated time for robot
     uint16_t getUpdatedTime(uint16_t currentTime, const Point& targetPosition) const;
+    uint16_t getTravelTime(const Point& startPosition, const Point& targetPosition) const;
 };
 
 #endif // ROBOT_H

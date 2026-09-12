@@ -79,6 +79,7 @@ class TaskAllocationAlgorithms {
         void clearUntraversedQueue();
         
         //algorithm metrics methods
+        AlgorithmMetrics& getMetrics() { return *metrics; }
         const AlgorithmMetrics& getMetrics() const { return *metrics; }
         void resetMetrics() { *metrics = AlgorithmMetrics(); }
         

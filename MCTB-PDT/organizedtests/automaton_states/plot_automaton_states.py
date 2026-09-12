@@ -42,7 +42,8 @@ for csv_file in sorted(csv_files):
             # Extract key metrics
             metrics = {
                 'automaton_states': int(row['num_automaton_states']),
-                'total_computation_time_ms': float(row['total_computation_time_ms'])
+                'total_computation_time_ms': float(row['total_computation_time_ms']),
+                'makespan': float(row['tree_makespan_seconds']) if 'tree_makespan_seconds' in row and row['tree_makespan_seconds'] else 0
             }
             
             # Store in appropriate dict
@@ -63,15 +64,19 @@ automaton_ids_45 = sorted(data_45robots.keys())
 
 times_3robots = [data_3robots[aid]["total_computation_time_ms"] for aid in automaton_ids_3]
 states_3robots = [data_3robots[aid]["automaton_states"] for aid in automaton_ids_3]
+makespans_3robots = [data_3robots[aid]["makespan"] for aid in automaton_ids_3]
 
 times_6robots = [data_6robots[aid]["total_computation_time_ms"] for aid in automaton_ids_6]
 states_6robots = [data_6robots[aid]["automaton_states"] for aid in automaton_ids_6]
+makespans_6robots = [data_6robots[aid]["makespan"] for aid in automaton_ids_6]
 
 times_15robots = [data_15robots[aid]["total_computation_time_ms"] for aid in automaton_ids_15]
 states_15robots = [data_15robots[aid]["automaton_states"] for aid in automaton_ids_15]
+makespans_15robots = [data_15robots[aid]["makespan"] for aid in automaton_ids_15]
 
 times_45robots = [data_45robots[aid]["total_computation_time_ms"] for aid in automaton_ids_45]
 states_45robots = [data_45robots[aid]["automaton_states"] for aid in automaton_ids_45]
+makespans_45robots = [data_45robots[aid]["makespan"] for aid in automaton_ids_45]
 
 # Create separate figures for each robot count
 # ============================================================================
@@ -159,7 +164,95 @@ print("✓ Plot saved as Plots/automaton_computation_time_45robots.png")
 plt.close(fig4)
 
 # ============================================================================
-# FIGURE 5: Comparison of All Robot Configurations
+# FIGURE 5: Makespan vs Automaton States - 3-Robot Environment
+# ============================================================================
+if any(makespans_3robots):
+    fig5, ax5 = plt.subplots(figsize=(10, 6))
+    fig5.suptitle('Automaton Complexity vs Makespan (3-Robot Team)', fontsize=16, fontweight='bold')
+
+    ax5.plot(states_3robots, makespans_3robots, marker='o', markersize=8, 
+             linewidth=2.5, color='#1f77b4', label='3-Robot Team')
+    ax5.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
+    ax5.set_ylabel('Makespan (seconds)', fontsize=12, fontweight='bold')
+    ax5.grid(True, alpha=0.3)
+
+    # Add value labels on points
+    for i, (s, m) in enumerate(zip(states_3robots, makespans_3robots)):
+        ax5.text(s, m, f'{m:.2f}s', ha='center', va='bottom', fontweight='bold')
+
+    plt.tight_layout()
+    plt.savefig('Plots/automaton_makespan_3robots.png', dpi=300, bbox_inches='tight')
+    print("✓ Plot saved as Plots/automaton_makespan_3robots.png")
+    plt.close(fig5)
+
+# ============================================================================
+# FIGURE 6: Makespan vs Automaton States - 6-Robot Environment
+# ============================================================================
+if any(makespans_6robots):
+    fig6, ax6 = plt.subplots(figsize=(10, 6))
+    fig6.suptitle('Automaton Complexity vs Makespan (6-Robot Team)', fontsize=16, fontweight='bold')
+
+    ax6.plot(states_6robots, makespans_6robots, marker='s', markersize=8, 
+             linewidth=2.5, color='#ff7f0e', label='6-Robot Team')
+    ax6.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
+    ax6.set_ylabel('Makespan (seconds)', fontsize=12, fontweight='bold')
+    ax6.grid(True, alpha=0.3)
+
+    # Add value labels on points
+    for i, (s, m) in enumerate(zip(states_6robots, makespans_6robots)):
+        ax6.text(s, m, f'{m:.2f}s', ha='center', va='bottom', fontweight='bold')
+
+    plt.tight_layout()
+    plt.savefig('Plots/automaton_makespan_6robots.png', dpi=300, bbox_inches='tight')
+    print("✓ Plot saved as Plots/automaton_makespan_6robots.png")
+    plt.close(fig6)
+
+# ============================================================================
+# FIGURE 7: Makespan vs Automaton States - 15-Robot Environment
+# ============================================================================
+if any(makespans_15robots):
+    fig7, ax7 = plt.subplots(figsize=(10, 6))
+    fig7.suptitle('Automaton Complexity vs Makespan (15-Robot Team)', fontsize=16, fontweight='bold')
+
+    ax7.plot(states_15robots, makespans_15robots, marker='^', markersize=8, 
+             linewidth=2.5, color='#2ca02c', label='15-Robot Team')
+    ax7.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
+    ax7.set_ylabel('Makespan (seconds)', fontsize=12, fontweight='bold')
+    ax7.grid(True, alpha=0.3)
+
+    # Add value labels on points
+    for i, (s, m) in enumerate(zip(states_15robots, makespans_15robots)):
+        ax7.text(s, m, f'{m:.2f}s', ha='center', va='bottom', fontweight='bold')
+
+    plt.tight_layout()
+    plt.savefig('Plots/automaton_makespan_15robots.png', dpi=300, bbox_inches='tight')
+    print("✓ Plot saved as Plots/automaton_makespan_15robots.png")
+    plt.close(fig7)
+
+# ============================================================================
+# FIGURE 8: Makespan vs Automaton States - 45-Robot Environment
+# ============================================================================
+if any(makespans_45robots):
+    fig8, ax8 = plt.subplots(figsize=(10, 6))
+    fig8.suptitle('Automaton Complexity vs Makespan (45-Robot Team)', fontsize=16, fontweight='bold')
+
+    ax8.plot(states_45robots, makespans_45robots, marker='D', markersize=8, 
+             linewidth=2.5, color='#d62728', label='45-Robot Team')
+    ax8.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
+    ax8.set_ylabel('Makespan (seconds)', fontsize=12, fontweight='bold')
+    ax8.grid(True, alpha=0.3)
+
+    # Add value labels on points
+    for i, (s, m) in enumerate(zip(states_45robots, makespans_45robots)):
+        ax8.text(s, m, f'{m:.2f}s', ha='center', va='bottom', fontweight='bold')
+
+    plt.tight_layout()
+    plt.savefig('Plots/automaton_makespan_45robots.png', dpi=300, bbox_inches='tight')
+    print("✓ Plot saved as Plots/automaton_makespan_45robots.png")
+    plt.close(fig8)
+
+# ============================================================================
+# FIGURE 9: Comparison of All Robot Configurations - Computation Time
 # ============================================================================
 fig5, ax5 = plt.subplots(figsize=(12, 7))
 fig5.suptitle('Automaton Complexity vs Computation Time (All Configurations)', fontsize=16, fontweight='bold')
@@ -183,6 +276,35 @@ plt.savefig('Plots/automaton_computation_time_all_configs.png', dpi=300, bbox_in
 print("✓ Plot saved as Plots/automaton_computation_time_all_configs.png")
 plt.close(fig5)
 
+# ============================================================================
+# FIGURE 10: Comparison of All Robot Configurations - Makespan
+# ============================================================================
+fig10, ax10 = plt.subplots(figsize=(12, 7))
+fig10.suptitle('Automaton Complexity vs Makespan (All Configurations)', fontsize=16, fontweight='bold')
+
+if any(makespans_3robots):
+    ax10.plot(states_3robots, makespans_3robots, marker='o', markersize=8, 
+             linewidth=2.5, color='#1f77b4', label='3-Robot Team')
+if any(makespans_6robots):
+    ax10.plot(states_6robots, makespans_6robots, marker='s', markersize=8, 
+             linewidth=2.5, color='#ff7f0e', label='6-Robot Team')
+if any(makespans_15robots):
+    ax10.plot(states_15robots, makespans_15robots, marker='^', markersize=8, 
+             linewidth=2.5, color='#2ca02c', label='15-Robot Team')
+if any(makespans_45robots):
+    ax10.plot(states_45robots, makespans_45robots, marker='D', markersize=8, 
+             linewidth=2.5, color='#d62728', label='45-Robot Team')
+
+ax10.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
+ax10.set_ylabel('Makespan (seconds)', fontsize=12, fontweight='bold')
+ax10.legend(fontsize=11, loc='best')
+ax10.grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.savefig('Plots/automaton_makespan_all_configs.png', dpi=300, bbox_inches='tight')
+print("✓ Plot saved as Plots/automaton_makespan_all_configs.png")
+plt.close(fig10)
+
 # Print summary
 print("\n" + "="*80)
 print("SUMMARY STATISTICS")
@@ -192,24 +314,28 @@ print("3-Robot Environment:")
 for aid in automaton_ids_3:
     states = data_3robots[aid]["automaton_states"]
     t = data_3robots[aid]["total_computation_time_ms"]
-    print(f"  Automaton {aid}: {states} states, {t:.2f} ms")
+    m = data_3robots[aid]["makespan"]
+    print(f"  Automaton {aid}: {states} states, {t:.2f} ms, makespan: {m:.2f}s")
 
 print("\n6-Robot Environment:")
 for aid in automaton_ids_6:
     states = data_6robots[aid]["automaton_states"]
     t = data_6robots[aid]["total_computation_time_ms"]
-    print(f"  Automaton {aid}: {states} states, {t:.2f} ms")
+    m = data_6robots[aid]["makespan"]
+    print(f"  Automaton {aid}: {states} states, {t:.2f} ms, makespan: {m:.2f}s")
 
 print("\n15-Robot Environment:")
 for aid in automaton_ids_15:
     states = data_15robots[aid]["automaton_states"]
     t = data_15robots[aid]["total_computation_time_ms"]
-    print(f"  Automaton {aid}: {states} states, {t:.2f} ms")
+    m = data_15robots[aid]["makespan"]
+    print(f"  Automaton {aid}: {states} states, {t:.2f} ms, makespan: {m:.2f}s")
 
 print("\n45-Robot Environment:")
 for aid in automaton_ids_45:
     states = data_45robots[aid]["automaton_states"]
     t = data_45robots[aid]["total_computation_time_ms"]
-    print(f"  Automaton {aid}: {states} states, {t:.2f} ms")
+    m = data_45robots[aid]["makespan"]
+    print(f"  Automaton {aid}: {states} states, {t:.2f} ms, makespan: {m:.2f}s")
 
 print("\n" + "="*80 + "\n")
