@@ -18,10 +18,14 @@ private:
 public:
     TS();
     
+    // Copy constructor for deep copying
+    TS(const TS& other);
+    
     ~TS() override;
 
     // Override pure virtual methods from Automaton
     void add_Node(Node* node) override;
+    void removeNode(uint16_t nodeId);
     bool isAdjacent(uint16_t srcId, uint16_t dstId) const override;
 
     // Get all adjacent nodes for a given node
