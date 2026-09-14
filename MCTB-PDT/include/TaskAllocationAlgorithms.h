@@ -4,8 +4,8 @@
 #include "AlgorithmMetrics.h"
 #include "Tree/PlanningDecisionTree.h"
 #include "Environment/Environment.h"
-#include "../Automatons/BuchiAutomaton.h"
-#include "../Transition_Systems/GeneralTransitionSystem.h"
+#include "../../Automatons/BuchiAutomaton.h"
+#include "../../Transition_Systems/GeneralTransitionSystem.h"
 #include "MultiRobotSystem/MultiRobotSystem.h"
 #include "MultiRobotSystem/RobotCapabilities.h"
 #include <vector>

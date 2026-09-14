@@ -263,3 +263,69 @@ std::string MultiRobotSystem::to_string() const {
     return ss.str();
 }
 
+
+/**
+ * getTotalRobotCapabilities - Get the union of all capabilities across all robots
+ */
+uint16_t MultiRobotSystem::getTotalRobotCapabilities() const {
+    // Create a zero vector of capabilities
+    std::vector<bool> capabilities;
+    
+    // Build it from all robots
+    for (const auto* robot : robots) {
+        if (robot) {
+            const auto& robotCaps = robot->getCapabilities();
+            if (capabilities.empty()) {
+                // Initialize with the first robot's capabilities
+                capabilities = robotCaps;
+            } else {
+                // OR the capabilities together
+                for (size_t i = 0; i < robotCaps.size() && i < capabilities.size(); ++i) {
+                    capabilities[i] = capabilities[i] || robotCaps[i];
+                }
+            }
+        }
+    }
+    
+    // Count the total true values
+    uint16_t total = 0;
+    for (bool cap : capabilities) {
+        if (cap) {
+            total += 1;
+        }
+    }
+    return total;
+}
+
+/**
+ * getIndependentRobotCapabilities - Get the union of independent robot capabilities (no double counting)
+ */
+uint16_t MultiRobotSystem::getIndependentCapabilities() const {
+    // Create a zero vector of capabilities
+    std::vector<bool> capabilities;
+    
+    // Build it from all robots (treating each independently)
+    for (const auto* robot : robots) {
+        if (robot) {
+            const auto& robotCaps = robot->getCapabilities();
+            if (capabilities.empty()) {
+                // Initialize with the first robot's capabilities
+                capabilities = robotCaps;
+            } else {
+                // OR the capabilities together (no double counting)
+                for (size_t i = 0; i < robotCaps.size() && i < capabilities.size(); ++i) {
+                    capabilities[i] = capabilities[i] || robotCaps[i];
+                }
+            }
+        }
+    }
+    
+    // Count the total true values
+    uint16_t total = 0;
+    for (bool cap : capabilities) {
+        if (cap) {
+            total += 1;
+        }
+    }
+    return total;
+}

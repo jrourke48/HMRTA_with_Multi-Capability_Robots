@@ -14,9 +14,12 @@ void AlgorithmMetrics::clearMetrics() {
     // Explicitly clear independent variables
     iv_.num_automaton_states = 0;
     iv_.num_automaton_edges = 0;
+    iv_.total_required_capabilities = 0;
+    iv_.independent_required_capabilities = 0;
     iv_.num_atomic_propositions = 0;
     iv_.num_robots = 0;
     iv_.total_robot_capabilities = 0;
+    iv_.independent_robot_capabilities = 0;
     iv_.num_ts_regions = 0;
     iv_.avg_capabilities_per_robot = 0.0;
     iv_.capability_homogeneity = 0.0;
@@ -39,7 +42,7 @@ void AlgorithmMetrics::clearMetrics() {
     subtree_efficiency_.tree_product_ratio = 0.0;
     subtree_efficiency_.memory_reduction_ratio = 0.0;
     subtree_efficiency_.optimality_gap_percent = 0.0;
-    subtree_efficiency_.runtime_speedup_percent = 0.0;
+    subtree_efficiency_.runtime_speedup = 0.0;
     subtree_efficiency_.percent_nodes_in_tree = 0.0;
     subtree_efficiency_.state_space_reduction = 0;
     
@@ -65,7 +68,7 @@ void AlgorithmMetrics::setIndependentVariables(const IndependentVariables& vars)
         iv_.avg_capabilities_per_robot = 
             static_cast<double>(vars.total_robot_capabilities) / vars.num_robots;
         iv_.capability_homogeneity = 
-            static_cast<double>(vars.total_robot_capabilities) / vars.num_robots;
+            static_cast<double>(vars.independent_robot_capabilities) / vars.num_robots;
     }
 }
 
@@ -159,6 +162,16 @@ double AlgorithmMetrics::computeMemoryReductionRatio() const {
     return static_cast<double>(subtree_efficiency_.task_allocation_algorithm_memory_MB) / 
            subtree_efficiency_.full_product_automaton_memory_MB;
 }
+double AlgorithmMetrics::computeOptimalityGap() const {
+    if (solution_quality_.tree_makespan_seconds == 0) return 0.0;
+    return static_cast<double>(solution_quality_.tree_makespan_seconds-solution_quality_.product_makespan_seconds) / 
+           solution_quality_.tree_makespan_seconds;
+}
+double AlgorithmMetrics::computeRuntimeSpeedup() const {
+    if (total_computation_time_ms == 0) return 0.0;
+    return (product_computation_time_ms) / 
+           total_computation_time_ms;
+}
 
 double AlgorithmMetrics::computeRobotUtilizationRatio() const {
     if (iv_.num_robots == 0) return 0.0;
@@ -186,6 +199,7 @@ void AlgorithmMetrics::computeDerivedMetrics() {
     subtree_efficiency_.tree_product_ratio = computeTreeProductRatio();
     subtree_efficiency_.memory_reduction_ratio = computeMemoryReductionRatio();
     subtree_efficiency_.percent_nodes_in_tree = computePercentNodesInTree();
+
     subtree_efficiency_.state_space_reduction = 
         subtree_efficiency_.full_product_automaton_nodes - 
         subtree_efficiency_.total_nodes_planning;
@@ -193,6 +207,8 @@ void AlgorithmMetrics::computeDerivedMetrics() {
     // Solution quality derived metrics
     solution_quality_.robot_utilization_ratio = computeRobotUtilizationRatio();
     solution_quality_.load_balance_variance = computeLoadBalanceVariance();
+    subtree_efficiency_.optimality_gap_percent = computeOptimalityGap();
+    subtree_efficiency_.runtime_speedup = computeRuntimeSpeedup();
 }
 
 // ==================== REPORTING ====================
@@ -206,9 +222,12 @@ void AlgorithmMetrics::printSummary() const {
     std::cout << "INDEPENDENT VARIABLES:" << std::endl;
     std::cout << "  Automaton States: " << iv_.num_automaton_states << std::endl;
     std::cout << "  Automaton Edges: " << iv_.num_automaton_edges << std::endl;
+    std::cout << "  Total Required Capabilities: " << iv_.total_required_capabilities << std::endl;
+    std::cout << "  Independent Required Capabilities: " << iv_.independent_required_capabilities << std::endl;
     std::cout << "  Atomic Propositions: " << iv_.num_atomic_propositions << std::endl;
     std::cout << "  Number of Robots: " << iv_.num_robots << std::endl;
     std::cout << "  Total Robot Capabilities: " << iv_.total_robot_capabilities << std::endl;
+    std::cout << "  Independent Robot Capabilities: " << iv_.independent_robot_capabilities << std::endl;
     std::cout << "  Transition System Regions: " << iv_.num_ts_regions << std::endl;
     std::cout << "  Avg Capabilities/Robot: " << std::fixed << std::setprecision(2) 
               << iv_.avg_capabilities_per_robot << std::endl;
@@ -226,6 +245,8 @@ void AlgorithmMetrics::printSummary() const {
     std::cout << "  Full Product Edges: " << subtree_efficiency_.full_product_automaton_edges << std::endl;
     std::cout << "  Full Product Computation Time: " << std::fixed << std::setprecision(2) 
               << product_computation_time_ms << " ms" << std::endl;
+    std::cout << "  Full Product Makespan: " << std::fixed << std::setprecision(2) 
+              << solution_quality_.product_makespan_seconds << " s" << std::endl;
     std::cout << "  Full Product Memory Usage: " << std::fixed << std::setprecision(2) 
               << subtree_efficiency_.full_product_automaton_memory_MB << " MB" << "\n" << std::endl;
     
@@ -247,7 +268,7 @@ void AlgorithmMetrics::printSummary() const {
     std::cout << "  Optimality Gap: " << std::fixed << std::setprecision(2) 
               << subtree_efficiency_.optimality_gap_percent << "%" << std::endl;
     std::cout << "  Runtime Speedup: " << std::fixed << std::setprecision(2) 
-              << subtree_efficiency_.runtime_speedup_percent << "%" << std::endl;
+              << subtree_efficiency_.runtime_speedup << std::endl;
     std::cout << "  State-Space Reduction: " << subtree_efficiency_.state_space_reduction << "\n" << std::endl;
     
     // Solution Quality
@@ -296,6 +317,8 @@ void AlgorithmMetrics::exportToCSV(const std::string& filename) const {
     outfile << "Full Product Edges," << subtree_efficiency_.full_product_automaton_edges << ",count\n";
     outfile << "Full Product Computation Time," << std::fixed << std::setprecision(2) 
             << product_computation_time_ms << ",ms\n";
+    outfile << "Full Product Makespan," << std::fixed << std::setprecision(2) 
+            << solution_quality_.product_makespan_seconds << ",seconds\n";
     outfile << "Full Product Memory Usage," << std::fixed << std::setprecision(2) 
             << subtree_efficiency_.full_product_automaton_memory_MB << ",MB\n";
     
@@ -350,6 +373,8 @@ void AlgorithmMetrics::exportToJSON(const std::string& filename) const {
     outfile << "    \"full_product_edges\": " << subtree_efficiency_.full_product_automaton_edges << ",\n";
     outfile << "    \"full_product_computation_time_ms\": " << std::fixed << std::setprecision(2) 
             << product_computation_time_ms << ",\n";
+    outfile << "    \"full_product_makespan_seconds\": " << std::fixed << std::setprecision(2) 
+            << solution_quality_.product_makespan_seconds << ",\n";
     outfile << "    \"full_product_memory_MB\": " << std::fixed << std::setprecision(2) 
             << subtree_efficiency_.full_product_automaton_memory_MB << "\n";
     outfile << "  },\n";

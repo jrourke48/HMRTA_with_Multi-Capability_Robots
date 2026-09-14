@@ -33,6 +33,8 @@ public:
     
     std::vector<Robot*> getRobotsWithCapability(RobotCapability cap) const;
     std::vector<uint8_t> getRobotIdsWithCapability(RobotCapability cap) const;
+    uint16_t getTotalRobotCapabilities() const;
+    uint16_t getIndependentCapabilities() const;
     bool hasRobotWithCapability(RobotCapability cap) const;
     uint8_t countRobotsWithCapability(RobotCapability cap) const;
     std::vector<Robot*> getRobotsWithAllCapabilities(const std::vector<RobotCapability>& caps) const;

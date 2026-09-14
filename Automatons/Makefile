@@ -20,7 +20,7 @@ LTLtoBuchiAutomaton: $(OUTDIR) LTLtoBuchiAutomaton.cpp ../Transition_Systems/Gri
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(LDFLAGS) LTLtoBuchiAutomaton.cpp ../Transition_Systems/GridWorldTransitionSystem.cpp -o $(OUTDIR)/$@.exe $(LIBS)
 
 TestingAutomaton: $(OUTDIR) TestingAutomaton.cpp ../Transition_Systems/GridWorldTransitionSystem.cpp TS.cpp BuchiAutomaton.cpp ProductAutomaton.cpp
-	$(CXX) $(CXXFLAGS) $(INCLUDES) $(LDFLAGS) TestingAutomaton.cpp ../Transition_Systems/GridWorldTransitionSystem.cpp TS.cpp BuchiAutomaton.cpp ProductAutomaton.cpp ../MCTB-PDT/src/Environment/GridWorld.cpp ../MCTB-PDT/src/Environment/Point.cpp ../MCTB-PDT/src/Environment/Environment.cpp ../MCTB-PDT/src/MultiRobotSystem/MultiRobotSystem.cpp ../MCTB-PDT/src/MultiRobotSystem/Robot.cpp ../MCTB-PDT/src/LTLFormula/LTLFormula.cpp ../MCTB-PDT/src/LTLFormula/BatchAtomicProposition.cpp -o $(OUTDIR)/$@.exe $(LIBS)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(LDFLAGS) TestingAutomaton.cpp ../Transition_Systems/GridWorldTransitionSystem.cpp TS.cpp BuchiAutomaton.cpp ProductAutomaton.cpp ../MCTB-PDT/src/Environment/GridWorld.cpp ../MCTB-PDT/src/Environment/Point.cpp ../MCTB-PDT/src/Environment/Environment.cpp ../MCTB-PDT/src/MultiRobotSystem/MultiRobotSystem.cpp ../MCTB-PDT/src/MultiRobotSystem/Robot.cpp ../MCTB-PDT/src/LTLFormula/LTLFormula.cpp ../MCTB-PDT/src/LTLFormula/BatchAtomicProposition.cpp ../MCTB-PDT/src/TaskAllocationAlgorithms.cpp ../MCTB-PDT/src/AlgorithmMetrics.cpp ../MCTB-PDT/src/Tree/PlanningDecisionTree.cpp ../MCTB-PDT/src/Tree/Tree_Node.cpp -o $(OUTDIR)/$@.exe $(LIBS)
 
 GlobalState: $(OUTDIR) GlobalState.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(LDFLAGS) GlobalState.cpp -o $(OUTDIR)/$@.exe $(LIBS)

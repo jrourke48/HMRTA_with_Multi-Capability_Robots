@@ -126,6 +126,50 @@ int8_t LTLFormula::getBatchVal(uint16_t apId) const {
     }
     throw std::out_of_range("AP ID not found");
 }
+// Get the total required capabilities
+uint16_t LTLFormula::getTotalRequiredCapabilities() const {
+    if (!batchAPs) throw std::runtime_error("BatchAPs vector is null");
+    uint16_t total = 0;
+    for (const auto& batchAP : *batchAPs) {
+        for (bool cap : batchAP.getCapabilities()) {
+            if (cap) {
+                total += 1;
+            }
+        }
+    }
+    return total;
+}
+
+// Get the independent required capabilities
+uint16_t LTLFormula::getIndependentRequiredCapabilities() const {
+    if (!batchAPs) throw std::runtime_error("BatchAPs vector is null");
+    
+    // Create a zero vector of capabilities
+    std::vector<bool> capabilities;
+    
+    // Build it from independent batch atomic propositions
+    for (const auto& batchAP : *batchAPs) {
+        if (capabilities.empty()) {
+            // Initialize with the first batchAP's capabilities
+            capabilities = batchAP.getCapabilities();
+        } else {
+            // OR the capabilities together
+            const auto& batchCaps = batchAP.getCapabilities();
+            for (size_t i = 0; i < batchCaps.size() && i < capabilities.size(); ++i) {
+                capabilities[i] = capabilities[i] || batchCaps[i];
+            }
+        }
+    }
+    
+    // Count the total true values
+    uint16_t total = 0;
+    for (bool cap : capabilities) {
+        if (cap) {
+            total += 1;
+        }
+    }
+    return total;
+}
 
 // Check if formula is valid
 bool LTLFormula::isValid() const {

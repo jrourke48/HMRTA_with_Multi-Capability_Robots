@@ -16,7 +16,6 @@
 #include <spot/twa/twaproduct.hh>
 #include <spot/twaalgos/emptiness.hh>
 #include <bddx.h>
-#include "../Transition_Systems/GridWorldTransitionSystem.h"
 #include "TS.h"
 #include "BuchiAutomaton.h"
 #include "ProductAutomaton.h"
@@ -27,6 +26,7 @@
 #include "MultiRobotSystem/RobotCapabilities.h"
 #include "LTLFormula/LTLFormula.h"
 #include "LTLFormula/BatchAtomicProposition.h"
+#include "../MCTB-PDT/include/TaskAllocationAlgorithms.h"
 
 int main()
 {
@@ -151,19 +151,18 @@ int main()
         
         // Create ProductAutomaton
         std::cout << "Creating product automaton...\n" << std::endl;
-        ProductAutomaton productAutomaton(*env, *mrs1, *buchi);
-        
-        std::cout << "  - Nodes: " << productAutomaton.getNumStates() << std::endl;
-        std::cout << "  - Edges: " << productAutomaton.getNumEdges() << std::endl;
-        std::cout << "  - Accepting states: " << productAutomaton.getAcceptingStates().size() << std::endl;
-        
-        // Visualize the Spot product automaton
-        std::ofstream dotFile("output/testing_product_automaton.dot");
-        spot::print_dot(dotFile, productAutomaton.getSpotAutomaton());
-        dotFile.close();
-        std::cout << "✓ Product automaton visualization saved to output/testing_product_automaton.dot\n" << std::endl;
+        //ProductAutomaton productAutomaton(*env, *mrs1, *buchi);
+        // std::cout << "  - Nodes: " << productAutomaton.getNumStates() << std::endl;
+        // std::cout << "  - Edges: " << productAutomaton.getNumEdges() << std::endl;
+        // std::cout << "  - Accepting states: " << productAutomaton.getAcceptingStates().size() << std::endl;
+            
+        // // Visualize the Spot product automaton
+        // std::ofstream dotFile("output/testing_product_automaton.dot");
+        // spot::print_dot(dotFile, productAutomaton.getSpotAutomaton());
+        // dotFile.close();
+        // std::cout << "✓ Product automaton visualization saved to output/testing_product_automaton.dot\n" << std::endl;
 
-        for (int numRobots = 1; numRobots <= 6; numRobots++) {
+        for (int numRobots = 1; numRobots <= 4; numRobots++) {
             std::cout << "Test " << numRobots << ": Creating " << numRobots << " robot(s)... ";
             std::cout.flush();
             
@@ -172,6 +171,7 @@ int main()
 
           
             
+
             // Create ProductAutomaton
             ProductAutomaton productAutomaton(*env, *mrs2, *buchi);
             
@@ -197,16 +197,11 @@ int main()
                     spot::print_dot(dotFile, productAutomaton.getSpotAutomaton());
                     dotFile.close();
                     std::cout << "  ✓ Product automaton visualization saved to output/testing_product_automaton_2robots.dot\n";
-                    // for (uint16_t stateId = 0; stateId < productAutomaton.getNumStates(); stateId++) {
-                    //     std::cout << "   State " << stateId << "\n";
-                    //     for (const auto& productState : productAutomaton.getNode(stateId)->getProductStates().second) {
-                    //         std::cout << "    - " << productState << "\n";
-                    //     }
-                    // }
                 }
                 // Test OptimalAcceptingPath algorithm
                 std::cout << "  Testing OptimalAcceptingPath... ";
-                std::vector<uint16_t> path = productAutomaton.OptimalAcceptingPath();
+                std::tuple<std::vector<uint16_t>, uint32_t> result = productAutomaton.OptimalAcceptingPath();
+                std::vector<uint16_t> path = std::get<0>(result);
             
                 if (!path.empty()) {
                     std::cout << "✓ Found path of length " << path.size() << ": ";
@@ -227,8 +222,27 @@ int main()
                             break;
                         }
                     }
+                    if (numRobots == 4) {
+                        std::cout << "  Note: Testing with 4 robots." << std::endl;
+                        // Create TaskAllocationAlgorithms
+                        TaskAllocationAlgorithms* allocAlg = new TaskAllocationAlgorithms(buchi, env, mrs2);
+                        
+                        //build the planning decision tree
+                        allocAlg->intensiveInterTaskRelationshipTreeSearch(buchi, env, mrs2);
+                        //add the full product automaton metrics to the algorithm metrics
+                        allocAlg->getMetrics().setFullProductAutomatonMetrics(
+                            productAutomaton.getNumStates(),
+                            productAutomaton.getNumEdges(),
+                            std::get<1>(result),
+                            1000,
+                            10
+                        );
+                        allocAlg->getMetrics().computeDerivedMetrics();
+                        allocAlg->getMetrics().printSummary();
+                        delete allocAlg;
+                    }
                     if (visitsAccepting) {
-                        std::cout << " ✓" << std::endl;
+                        std::cout << " ✓ (Total weight: " << std::get<1>(result) << ")" << std::endl;
                     } else {
                         std::cout << " (WARNING: no accepting state in path)" << std::endl;
                     }

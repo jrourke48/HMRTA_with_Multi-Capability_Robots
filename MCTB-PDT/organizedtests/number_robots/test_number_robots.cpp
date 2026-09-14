@@ -1,11 +1,11 @@
 #include <iostream>
 #include <vector>
+#include <tuple>
 #include <chrono>
 #include <fstream>
 #include <iomanip>
 #include <cstring>
 #include <sys/resource.h>
-#include <map>
 #include "../include/TaskAllocationAlgorithms.h"
 #include "../include/Environment/gridvis.h"
 #include "../include/Tree/PlanningDecisionTree.h"
@@ -18,13 +18,30 @@
 #include "../../Automatons/ProductAutomaton.h"
 
 using namespace std;
-
-// Test: Number of Robots (3-20 robots)
-// Fixed: 6 regions, 1 Buchi automaton
+//=================================================================================
+// Test: Number of Robots: 8 different robot counts 3, 6, 12, 18, 24, 30, 36, and 45
+//=================================================================================
+//Automata: 8 total automata 3-128 automaton states all with 6 TS regions each with only one capability per robot
+//
 
 // Forward declarations
-void createTestEnvironmentWithRobots(int numRobots, TS*& ts, GridWorld*& grid, Environment*& env, MultiRobotSystem*& mrs);
-BuchiAutomaton* createTestBuchiAutomaton();
+void createTestEnvironment3(TS*& ts, GridWorld*& grid, Environment*& env, MultiRobotSystem*& mrs);
+void createTestEnvironment6(TS*& ts, GridWorld*& grid, Environment*& env, MultiRobotSystem*& mrs);
+void createTestEnvironment12(TS*& ts, GridWorld*& grid, Environment*& env, MultiRobotSystem*& mrs);
+void createTestEnvironment18(TS*& ts, GridWorld*& grid, Environment*& env, MultiRobotSystem*& mrs);
+void createTestEnvironment24(TS*& ts, GridWorld*& grid, Environment*& env, MultiRobotSystem*& mrs);
+void createTestEnvironment30(TS*& ts, GridWorld*& grid, Environment*& env, MultiRobotSystem*& mrs);
+void createTestEnvironment36(TS*& ts, GridWorld*& grid, Environment*& env, MultiRobotSystem*& mrs);
+void createTestEnvironment45(TS*& ts, GridWorld*& grid, Environment*& env, MultiRobotSystem*& mrs);
+BuchiAutomaton* createTestInfiniteBuchiAutomaton1();
+BuchiAutomaton* createTestInfiniteBuchiAutomaton2();
+BuchiAutomaton* createTestInfiniteBuchiAutomaton3();
+BuchiAutomaton* createTestInfiniteBuchiAutomaton4();
+BuchiAutomaton* createTestInfiniteBuchiAutomaton5();
+BuchiAutomaton* createTestInfiniteBuchiAutomaton6();
+BuchiAutomaton* createTestInfiniteBuchiAutomaton7();
+BuchiAutomaton* createTestInfiniteBuchiAutomaton8();
+
 
 // Get memory usage in MB
 double getMemoryUsageMB() {
@@ -35,119 +52,214 @@ double getMemoryUsageMB() {
 
 int main() {
     cout << string(80, '=') << endl;
-    cout << "   NUMBER OF ROBOTS SCALING TEST SUITE" << endl;
-    cout << "   Variable: Number of Robots (3-20)" << endl;
-    cout << "   Fixed: 6 regions, 1 Buchi automaton" << endl;
+    cout << "   AUTOMATON SCALING TEST SUITE" << endl;
+    cout << "   8 Büchi Automata" << endl;
+    cout << "   8 Environments: 3-robot, 6-robot, 12-robot, 18-robot, 24-robot, 30-robot, 36-robot, and 45-robot" << endl;
+    cout << "   Total Tests: 64 (8 automata × 8 environments)" << endl;
     cout << string(80, '=') << "\n" << endl;
 
-    // Initialize TestRunManager for NUMBER_ROBOTS category
-    TestRunManager manager(TestRunManager::TestCategory::NUMBER_ROBOTS, ".");
+    // Initialize TestRunManager for NUM_ROBOTS category
+    TestRunManager manager(TestRunManager::TestCategory::NUM_ROBOTS, ".");
     manager.initialize();
     cout << "✓ TestRunManager initialized\n" << endl;
 
-    // Robot counts to test
-    vector<int> robotCounts = {3, 6, 8, 10, 12, 15, 18, 20};
+    // Create array of automaton factory functions
+    vector<BuchiAutomaton*(*)()> automatonFactories = {
+        createTestInfiniteBuchiAutomaton1,
+        createTestInfiniteBuchiAutomaton2,
+        createTestInfiniteBuchiAutomaton3,
+        createTestInfiniteBuchiAutomaton4,
+        createTestInfiniteBuchiAutomaton5,
+        createTestInfiniteBuchiAutomaton6,
+        createTestInfiniteBuchiAutomaton7,
+        createTestInfiniteBuchiAutomaton8
+    };
+    
+    vector<int> robotCounts = {3, 6, 12, 18, 24, 30, 36, 45};
     int testNum = 1;
     
-    cout << "\n" << string(80, '=') << endl;
-    cout << "   RUNNING ROBOT SCALING TESTS" << endl;
-    cout << string(80, '=') << "\n" << endl;
-    
-    // For each robot count
-    for (int robotCount : robotCounts) {
-        cout << "\n  Test " << testNum << " (" << robotCount << " robots)... ";
-        cout.flush();
+    // Run tests for each automaton (outer loop)
+    for (int automatonId = 1; automatonId <= 8; ++automatonId) {
+        cout << "\n" << string(80, '=') << endl;
+        cout << "   TESTING WITH AUTOMATON " << automatonId << endl;
+        cout << string(80, '=') << "\n" << endl;
         
-        try {
-            // Create test environment with variable number of robots
+        // For each robot count (inner loop)
+        for (int robotCount : robotCounts) {
+            cout << "\n  Test " << testNum << " (" << robotCount << "-robot environment)... ";
+            cout.flush();
+            
+            // Create test environment
             TS* ts = nullptr;
             GridWorld* grid = nullptr;
             Environment* env = nullptr;
             MultiRobotSystem* mrs = nullptr;
             
-            createTestEnvironmentWithRobots(robotCount, ts, grid, env, mrs);
-            
-            // Create the Buchi automaton
-            BuchiAutomaton* buchi = createTestBuchiAutomaton();
-            
-            if (!buchi) {
-                cout << "ERROR: Failed to create automaton" << endl;
-                delete mrs;
-                delete env;
-                delete grid;
-                delete ts;
-                testNum++;
-                continue;
+            if (robotCount == 3) {
+                createTestEnvironment3(ts, grid, env, mrs);
+            } else if (robotCount == 6) {
+                createTestEnvironment6(ts, grid, env, mrs);
+            } else if (robotCount == 12) {
+                createTestEnvironment12(ts, grid, env, mrs);
+            } else if (robotCount == 18) {
+                createTestEnvironment18(ts, grid, env, mrs);
+            } else if (robotCount == 24) {
+                createTestEnvironment24(ts, grid, env, mrs);
+            } else if (robotCount == 30) {
+                createTestEnvironment30(ts, grid, env, mrs);
+            } else if (robotCount == 36) {
+                createTestEnvironment36(ts, grid, env, mrs);
+            } else {
+                createTestEnvironment45(ts, grid, env, mrs);
             }
             
-            // Create TaskAllocationAlgorithms
-            TaskAllocationAlgorithms* allocAlg = new TaskAllocationAlgorithms(buchi, env, mrs);
+            try {
+                // Create the Buchi automaton
+                BuchiAutomaton* buchi = automatonFactories[automatonId - 1]();
+                
+                if (!buchi) {
+                    cout << "ERROR: Failed to create automaton" << endl;
+                    testNum++;
+                    delete mrs;
+                    delete env;
+                    delete grid;
+                    delete ts;
+                    continue;
+                }
+                
+                // Create TaskAllocationAlgorithms
+                TaskAllocationAlgorithms* allocAlg = new TaskAllocationAlgorithms(buchi, env, mrs);
+                
+                // Measure memory 
+                double memBefore = getMemoryUsageMB();
+                //build the planning decision tree
+                allocAlg->intensiveInterTaskRelationshipTreeSearch(buchi, env, mrs);
+                double memAfter = getMemoryUsageMB();
+                double memUsed = memAfter - memBefore;
+                allocAlg->getMetrics().setTaskMemoryUsageMB(memUsed);
+                // bool shouldSkip = (robotCount > 10) && (buchi->getNumStates()*std::pow(ts->getNumStates(), robotCount) > UINT16_MAX/2);
+                // if (!shouldSkip) {
+                //     //buld the product automaton and store its metrics
+                //     double memBeforeProduct = getMemoryUsageMB();
+                //     double startTimeProduct = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+                //     ProductAutomaton product(*env, *mrs, *buchi);
+                //     std::tuple<std::vector<uint16_t>, uint32_t> optimalPath = product.OptimalAcceptingPath();
+                //     double memAfterProduct = getMemoryUsageMB();
+                //     double endTimeProduct = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+                //     double memUsedProduct = memAfterProduct - memBeforeProduct;
+                    
+                //     //add the full product automaton metrics to the algorithm metrics
+                //     allocAlg->getMetrics().setFullProductAutomatonMetrics(
+                //         product.getNumStates(),
+                //         product.getNumEdges(),
+                //         std::get<1>(optimalPath), // makespan for product
+                //         (endTimeProduct - startTimeProduct) / 1e6,  // convert from nanoseconds to milliseconds
+                //         memUsedProduct
+                //     );
+                //     // Compute derived metrics after setting full product automaton metrics
+                //     allocAlg->getMetrics().computeDerivedMetrics();
+                // }
+                
+                allocAlg->getMetrics().printSummary();
+                
+                // Store run in TestRunManager
+                map<string, string> parameters;
+                parameters["automaton_id"] = to_string(automatonId);
+                parameters["num_robots"] = to_string(robotCount);
+                
+                manager.storeRun(
+                    allocAlg->getMetrics(),
+                    parameters,
+                    to_string(robotCount),  // independent variable: group by robot number
+                    1  // trial number
+                );
+                
+                delete allocAlg;
+                delete buchi;
+                
+            } catch (const exception& e) {
+                cout << "ERROR: " << e.what() << endl;
+            }
             
-            // Measure memory and time
-            double memBefore = getMemoryUsageMB();
-            // Build the planning decision tree
-            allocAlg->intensiveInterTaskRelationshipTreeSearch(buchi, env, mrs);
-            double memAfter = getMemoryUsageMB();
-            
-            cout << "✓ Complete\n";
-            allocAlg->getMetrics().printSummary();
-            
-            // Store run in TestRunManager
-            map<string, string> parameters;
-            parameters["num_robots"] = to_string(robotCount);
-            
-            manager.storeRun(
-                allocAlg->getMetrics(),
-                parameters,
-                to_string(robotCount),  // independent variable: group by robot count
-                1  // trial number
-            );
-            
-            delete allocAlg;
-            delete buchi;
+            // Cleanup for this iteration
             delete mrs;
             delete env;
             delete grid;
             delete ts;
             
-        } catch (const exception& e) {
-            cout << "ERROR: " << e.what() << endl;
+            testNum++;
         }
         
-        testNum++;
+        // Export results for this automaton
+        cout << "\n✓ Exporting results for automaton " << automatonId << "..." << endl;
+        cout << "  Current runs stored: " << manager.getCurrentNumberOfRuns() << endl;
+        manager.exportByConfiguration("data", "num_robots");
+        cout << "✓ Export complete\n" << endl;
+        
+        cout << "\n" << string(80, '=') << endl;
+        cout << "   AUTOMATON " << automatonId << " TESTING COMPLETE" << endl;
+        cout << string(80, '=') << "\n" << endl;
     }
-    
-    cout << "\n" << string(80, '=') << endl;
-    cout << "   TESTING COMPLETE" << endl;
-    cout << string(80, '=') << "\n" << endl;
 
-    cout << "\n✓ All tests completed!" << endl;
-    cout << "   - " << robotCounts.size() << " robot configurations tested" << endl;
+    cout << "\n" << string(80, '=') << "\n" << endl;
+    cout << "✓ All tests completed!" << endl;
+    cout << "   - 8 robot configuration tested with 8 automata: 64 total tests" << endl;;
     
-    // Export results from TestRunManager
-    cout << "\n✓ Exporting results from TestRunManager..." << endl;
-    manager.exportByConfiguration();
+    // Export final statistics
+    cout << "\n✓ Exporting final statistics..." << endl;
     manager.exportStatisticsToCSV("data/statistics.csv");
     manager.exportSummaryReport("data/summary_report.txt");
     manager.printTestProgress();
     
-    cout << "\n✓ Results stored in data/" << endl;
+    cout << "\n✓ CSV Results stored in data/ folder:" << endl;
+    cout << "   - num_robots_3.csv" << endl;
+    cout << "   - num_robots_6.csv" << endl;
+    cout << "   - num_robots_12.csv" << endl;
+    cout << "   - num_robots_18.csv" << endl;
+    cout << "   - num_robots_24.csv" << endl;
+    cout << "   - num_robots_30.csv" << endl;
+    cout << "   - num_robots_36.csv" << endl;
+    cout << "   - num_robots_45.csv" << endl;
+    cout << "\n✓ Statistics and summary stored in data/" << endl;
     cout << string(80, '=') << "\n" << endl;
     
     return 0;
 }
 
+
 /**
- * Create a Buchi automaton for testing
- * Formula: G(F("p0")) & G(F("p1")) & G(F("p2")) & (!p0 U p1)
+ * Test 1: Basic Conjunctive Liveness
+ * Simple conjunction of two infinitely-often conditions
+ * Complexity: 2 APs, 3 Automaton States
+ * G(F("p0")) & G(F("p2"))
  */
-BuchiAutomaton* createTestBuchiAutomaton() {
-    string ltl_str = "G(F(\"p0\")) & G(F(\"p1\")) & G(F(\"p2\")) & (!\"p0\" U \"p1\")";
+BuchiAutomaton* createTestInfiniteBuchiAutomaton1() {
+    string ltl_str = "(G(F(\"p0\")) & G(F(\"p2\")))";
+    
+    vector<BatchAtomicProposition> batchAPs;
+    batchAPs.push_back(BatchAtomicProposition(0, 0, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(2, 2, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
+    
+    LTLFormula* ltlFormula = new LTLFormula(ltl_str, batchAPs);
+    BuchiAutomaton* buchi = new BuchiAutomaton(ltlFormula);
+    buchi->visualize("output/automaton_test_infinite_1.dot");
+    return buchi;
+}
+
+/**
+ * Test 2: Nested Next Operators with Sequencing
+ * Combines infinitely-often with chained next operators
+ * Complexity: 4 APs, 6 Automaton States
+ * G(F("p0" & X("p1" & X"p2"))) & G(F("p3"))
+ */
+BuchiAutomaton* createTestInfiniteBuchiAutomaton2() {
+    string ltl_str = "G(F(\"p0\" & X(\"p1\" & X\"p2\"))) & G(F(\"p3\"))";
     
     vector<BatchAtomicProposition> batchAPs;
     batchAPs.push_back(BatchAtomicProposition(0, 0, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
     batchAPs.push_back(BatchAtomicProposition(1, 1, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(2, 2, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(2, 2, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(3, 3, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
 
     LTLFormula* ltlFormula = new LTLFormula(ltl_str, batchAPs);
     BuchiAutomaton* buchi = new BuchiAutomaton(ltlFormula);
@@ -155,12 +267,156 @@ BuchiAutomaton* createTestBuchiAutomaton() {
 }
 
 /**
- * Create test environment with variable number of robots
- * Fixed: 6 regions, 210x210 grid
+ * Test 3: Mixed Next and Until Operators
+ * Combines infinitely-often with until (weak until) patterns
+ * Complexity: 5 APs, 10 Automaton States
+ * G(F("p0")) & G(F("p1" & X("p2"))) & G(F(!"p3" U "p4") & G(F("p3")))
  */
-void createTestEnvironmentWithRobots(int numRobots, TS*& ts, GridWorld*& grid, Environment*& env, MultiRobotSystem*& mrs) {
-    // Allocate GridWorld
+BuchiAutomaton* createTestInfiniteBuchiAutomaton3() {
+    string ltl_str = "(G(F(\"p0\")) & G(F(\"p1\" & X(\"p2\"))) & G(F(!\"p3\" U \"p4\") & G(F(\"p3\"))))";
+    
+    vector<BatchAtomicProposition> batchAPs;
+    batchAPs.push_back(BatchAtomicProposition(0, 0, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(1, 1, {true, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(2, 2, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(3, 3, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(4, 4, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    
+    LTLFormula* ltlFormula = new LTLFormula(ltl_str, batchAPs);
+    BuchiAutomaton* buchi = new BuchiAutomaton(ltlFormula);
+    return buchi;
+}
+
+/**
+ * Test 4: Until with Disjunctive Branching
+ * Introduces disjunction at top level with complex nested structure
+ * Complexity: 5 APs, 16 Automaton States
+ * G((F("p0" & X(!"p1" U "p2")))) & G(F("p1")) & (G(F("p3")) | G(F("p4" & X("p0"))))
+ */
+BuchiAutomaton* createTestInfiniteBuchiAutomaton4() {
+    string ltl_str = "G((F(\"p0\" & X(!\"p1\" U \"p2\")))) & G(F(\"p1\")) & (G(F(\"p3\")) | G(F(\"p4\" & X(\"p0\"))))";
+    
+    vector<BatchAtomicProposition> batchAPs;
+    batchAPs.push_back(BatchAtomicProposition(0, 0, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(1, 1, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(2, 2, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(3, 3, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(4, 4, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
+
+    LTLFormula* ltlFormula = new LTLFormula(ltl_str, batchAPs);
+    BuchiAutomaton* buchi = new BuchiAutomaton(ltlFormula);
+    return buchi;
+}
+
+/**
+ * Test 5: Extended Formula with Infinitely-Often and Next Operators
+ * Enhances Test 6 pattern with additional temporal constraints (p8, p9)
+ * Complexity: 10 APs, 27 Automaton States
+ * G((F("p0" & X(!"p1" U "p2")))) & G(F("p1")) & (G(F("p3")) & G(F("p5")) & G(F("p8")) & X("p9") | G(F("p4" & X("p0")) & G(F("p6" & X("p7")))))
+ */
+BuchiAutomaton* createTestInfiniteBuchiAutomaton5() {
+    string ltl_str = "G((F(\"p0\" & X(!\"p1\" U \"p2\")))) & G(F(\"p1\")) & (G(F(\"p3\")) & G(F(\"p5\")) & G(F((\"p8\") & X(\"p9\")))) | G(F(\"p4\" & X(\"p0\")) & G(F(\"p6\" & X(\"p7\")))))";
+    
+    vector<BatchAtomicProposition> batchAPs;
+    batchAPs.push_back(BatchAtomicProposition(0, 0, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(1, 1, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(2, 2, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(3, 3, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(4, 4, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(5, 5, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(6, 2, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));  // p6
+    batchAPs.push_back(BatchAtomicProposition(7, 4, {true, false, false, true, false, true, false, false, false, false, false, false, false}, 0));  // p7
+    batchAPs.push_back(BatchAtomicProposition(8, 3, {true, false, false, true, false, true, false, false, false, false, false, false, false}, 0));  // p8
+    batchAPs.push_back(BatchAtomicProposition(9, 4, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));  // p9
+
+    LTLFormula* ltlFormula = new LTLFormula(ltl_str, batchAPs);
+    BuchiAutomaton* buchi = new BuchiAutomaton(ltlFormula);
+    return buchi;
+}
+
+/**
+ * Test 6: Conjunctive-Disjunctive Mixed Operators
+ * Combines multiple conjunctions with disjunction, nested until and next
+ * Complexity: 8 APs, 39 Automaton States
+ * G((F("p0" & X(!"p1" U "p2")))) & G(F("p1")) & (G(F("p3")) & G(F("p5")) | G(F("p4" & X("p0")) & G(F("p6" & X("p7")))))
+ */
+BuchiAutomaton* createTestInfiniteBuchiAutomaton6() {
+    string ltl_str = "G((F(\"p0\" & X(!\"p1\" U \"p2\")))) & G(F(\"p1\")) & (G(F(\"p3\")) & G(F(\"p5\")) | G(F(\"p4\" & X(\"p0\")) & G(F(\"p6\" & X(\"p7\")))))";
+    
+    vector<BatchAtomicProposition> batchAPs;
+    batchAPs.push_back(BatchAtomicProposition(0, 0, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(1, 1, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(2, 2, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(3, 3, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(4, 4, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(5, 5, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(6, 2, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));  // p6
+    batchAPs.push_back(BatchAtomicProposition(7, 4, {true, false, false, true, false, true, false, false, false, false, false, false, false}, 0));  // p7
+
+    LTLFormula* ltlFormula = new LTLFormula(ltl_str, batchAPs);
+    BuchiAutomaton* buchi = new BuchiAutomaton(ltlFormula);
+    return buchi;
+}
+
+/**
+ * Test 7: Standardized High-Complexity Formula (Variant 1)
+ * Complexity: 12 APs, 43 Automaton States, standardized G(F(!pX U pY)) pattern with conjunctive grouping
+ */
+BuchiAutomaton* createTestInfiniteBuchiAutomaton7() {
+    string ltl_str = "G((F(\"p0\" & X(!\"p1\" U \"p2\")))) & G(F(\"p1\")) & (G(F(\"p3\")) & G(F(\"p5\")) | G(F(\"p4\" & X(\"p0\")) & G(F(\"p6\" & X(\"p7\"))))) & F(\"p9\") & F(\"p10\") & F(\"p11\") & (!\"p9\" U \"p10\")";
+    
+    vector<BatchAtomicProposition> batchAPs;
+    batchAPs.push_back(BatchAtomicProposition(0, 0, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(1, 1, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(2, 2, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(3, 3, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(4, 4, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(5, 5, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(6, 2, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));  // p6
+    batchAPs.push_back(BatchAtomicProposition(7, 4, {true, false, false, true, false, true, false, false, false, false, false, false, false}, 0));  // p7
+    batchAPs.push_back(BatchAtomicProposition(9, 3, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));  // p9
+    batchAPs.push_back(BatchAtomicProposition(10, 1, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));  // p10
+    batchAPs.push_back(BatchAtomicProposition(11, 2, {true, false, false, true, false, true, false, false, false, false, false, false, false}, 0));  // p11
+    
+    LTLFormula* ltlFormula = new LTLFormula(ltl_str, batchAPs);
+    BuchiAutomaton* buchi = new BuchiAutomaton(ltlFormula);
+    return buchi;
+}
+
+/**
+ * Test 8: Standardized High-Complexity Formula (Variant 2)
+ * Complexity: 15 APs, 61 Automaton States, standardized G(F(!pX U pY)) pattern with conjunctive grouping
+ */
+BuchiAutomaton* createTestInfiniteBuchiAutomaton8() {
+    string ltl_str = "G((F(\"p0\" & X(!\"p1\" U \"p2\")))) & G(F(\"p1\")) & (G(F(\"p3\")) & G(F(\"p5\")) & G(F((\"p12\") & X(\"p13\"))) | G(F(\"p4\" & X(\"p0\")) & G(F(\"p6\" & X(\"p7\"))))) & F(\"p9\") & F(\"p10\") & F(\"p11\") & F(\"p14\") & (!\"p9\" U \"p10\")";
+    
+    vector<BatchAtomicProposition> batchAPs;
+    batchAPs.push_back(BatchAtomicProposition(0, 0, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(1, 1, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(2, 2, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(3, 3, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(4, 4, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(5, 5, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(6, 2, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));  // p6
+    batchAPs.push_back(BatchAtomicProposition(7, 4, {true, false, false, true, false, true, false, false, false, false, false, false, false}, 0));  // p7
+    batchAPs.push_back(BatchAtomicProposition(9, 3, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));  // p9
+    batchAPs.push_back(BatchAtomicProposition(10, 1, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));  // p10
+    batchAPs.push_back(BatchAtomicProposition(11, 2, {true, false, false, true, false, true, false, false, false, false, false, false, false}, 0));  // p11
+    batchAPs.push_back(BatchAtomicProposition(12, 3, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));  // p12
+    batchAPs.push_back(BatchAtomicProposition(13, 4, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));  // p13
+    batchAPs.push_back(BatchAtomicProposition(14, 5, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));  // p14
+
+    LTLFormula* ltlFormula = new LTLFormula(ltl_str, batchAPs);
+    BuchiAutomaton* buchi = new BuchiAutomaton(ltlFormula);
+    return buchi;
+}
+
+// ============================================================================
+//Create test environment with TS and GridWorld with 6 robots and 6 regions
+void createTestEnvironment6(TS*& ts, GridWorld*& grid, Environment*& env, MultiRobotSystem*& mrs) {
+// Allocate GridWorld
     grid = new GridWorld(210, 210);
+    cout << "✓ GridWorld created (210x210)" << endl;
     
     // Allocate Transition System
     ts = new TS();
@@ -173,7 +429,7 @@ void createTestEnvironmentWithRobots(int numRobots, TS*& ts, GridWorld*& grid, E
     Node* node4 = new Node(4, "R4");
     Node* node5 = new Node(5, "R5");
 
-    // with edges: 0-2 1-2 2-3 2-4 2-5
+    //with edges: 0-2 1-2 2-3 2-4 2-5
     node0->addEdge(Edge(2));
     node2->addEdge(Edge(0));
     node1->addEdge(Edge(2));
@@ -194,30 +450,33 @@ void createTestEnvironmentWithRobots(int numRobots, TS*& ts, GridWorld*& grid, E
     ts->add_Node(node5);
     ts->setInitial(0);
     
+    cout << "✓ Transition System created" << endl;
+    cout << "  - States: " << ts->getNumStates() << endl;
+    cout << "  - Initial state: 0" << endl;
+    
     // Allocate Environment
     env = new Environment(ts, grid);
+    cout << "✓ Environment created" << endl;
     
     // Map states to grid regions
-    env->mapTSStateToGrid(0, Point(180, 140), 50, 140);
-    env->mapTSStateToGrid(1, Point(180, 40), 50, 70);
-    env->mapTSStateToGrid(2, Point(100, 100), 60, 200);
-    env->mapTSStateToGrid(3, Point(50, 30), 50, 180);
-    env->mapTSStateToGrid(4, Point(50, 100), 50, 110);
-    env->mapTSStateToGrid(5, Point(50, 150), 50, 40);
+    env->mapTSStateToGrid(0, Point(180, 140), 60, 140);    // State 0 centered at (180,140)
+    env->mapTSStateToGrid(1, Point(180, 35), 60, 70);   // State 1 centered at (180,40)
+    env->mapTSStateToGrid(2, Point(120, 105), 60, 210);   // State 2 centered at (100,100)
+    env->mapTSStateToGrid(3, Point(45, 35), 90, 70);   // State 3 centered at (50,30)
+    env->mapTSStateToGrid(4, Point(45, 105), 90, 70);   // State 4 centered at (50,100)
+    env->mapTSStateToGrid(5, Point(45, 175), 90, 70);   // State 5 centered at (50,150)
+    cout << "✓ Mapped 6 states to grid regions" << endl;
     
-    // Create MultiRobotSystem with specified number of robots
+    // Create MultiRobotSystem with 6 robots
     mrs = new MultiRobotSystem();
     
-    // Calculate grid dimensions for robots
-    int cols = (int)ceil(sqrt(numRobots));
-    int rows = (int)ceil((double)numRobots / cols);
-    
-    // Position robots in a grid starting from room 0 center
-    for (int i = 1; i <= numRobots; i++) {
-        int col = (i - 1) % cols;
-        int row = (i - 1) / cols;
-        int x = 140 + col;
-        int y = 120 + row;
+    // Position 15 robots in a 3x2 grid, directly adjacent (1-unit spacing)
+    // Grid starts at (160, 80) in room 0
+    for (int i = 1; i <= 6; i++) {
+        int col = (i - 1) % 3;  // 0-2 horizontal
+        int row = (i - 1) / 3;  // 0-4 vertical
+        int x = 160 + col;
+        int y = 80 + row;
         
         // Rotate capabilities: GPS, MOVEMENT_GROUND, SENSOR_CAMERA
         RobotCapability cap = (i % 3 == 1) ? RobotCapability::SENSOR_GPS : 
@@ -229,5 +488,422 @@ void createTestEnvironmentWithRobots(int numRobots, TS*& ts, GridWorld*& grid, E
         r->enableCapability(cap);
         mrs->addRobot(r);
     }
+    cout << "✓ MultiRobotSystem created with 6 robots in a 3x2 grid" << endl;
+}
+
+// ============================================================================
+//Create test environment with TS and GridWorld with 3 robots and 6 regions
+void createTestEnvironment3(TS*& ts, GridWorld*& grid, Environment*& env, MultiRobotSystem*& mrs) {
+// Allocate GridWorld
+    grid = new GridWorld(210, 210);
+    cout << "✓ GridWorld created (210x210)" << endl;
+    
+    // Allocate Transition System
+    ts = new TS();
+    
+    // Add 6 states 
+    Node* node0 = new Node(0, "R0");
+    Node* node1 = new Node(1, "R1");
+    Node* node2 = new Node(2, "R2");
+    Node* node3 = new Node(3, "R3");
+    Node* node4 = new Node(4, "R4");
+    Node* node5 = new Node(5, "R5");
+
+    //with edges: 0-2 1-2 2-3 2-4 2-5
+    node0->addEdge(Edge(2));
+    node2->addEdge(Edge(0));
+    node1->addEdge(Edge(2));
+    node2->addEdge(Edge(1));
+    node3->addEdge(Edge(2));
+    node2->addEdge(Edge(3));
+    node4->addEdge(Edge(2));
+    node2->addEdge(Edge(4));
+    node5->addEdge(Edge(2));
+    node2->addEdge(Edge(5));
+    
+    // Add nodes to TS
+    ts->add_Node(node0);
+    ts->add_Node(node1);
+    ts->add_Node(node2);
+    ts->add_Node(node3);
+    ts->add_Node(node4);
+    ts->add_Node(node5);
+    ts->setInitial(0);
+    
+    cout << "✓ Transition System created" << endl;
+    cout << "  - States: " << ts->getNumStates() << endl;
+    cout << "  - Initial state: 0" << endl;
+    
+    // Allocate Environment
+    env = new Environment(ts, grid);
+    cout << "✓ Environment created" << endl;
+    
+    // Map states to grid regions
+    env->mapTSStateToGrid(0, Point(180, 140), 60, 140);    // State 0 centered at (180,140)
+    env->mapTSStateToGrid(1, Point(180, 35), 60, 70);   // State 1 centered at (180,40)
+    env->mapTSStateToGrid(2, Point(120, 105), 60, 210);   // State 2 centered at (100,100)
+    env->mapTSStateToGrid(3, Point(45, 35), 90, 70);   // State 3 centered at (50,30)
+    env->mapTSStateToGrid(4, Point(45, 105), 90, 70);   // State 4 centered at (50,100)
+    env->mapTSStateToGrid(5, Point(45, 175), 90, 70);   // State 5 centered at (50,150)
+    cout << "✓ Mapped 6 states to grid regions" << endl;
+    
+    // Create MultiRobotSystem with 15 robots
+    mrs = new MultiRobotSystem();
+    
+    // Position 3 robots in a 3x1 grid, directly adjacent (1-unit spacing)
+    // Grid starts at (160, 80) in room 0
+    for (int i = 1; i <= 3; i++) {
+        int col = (i - 1) % 3;  // 0-2 horizontal
+        int row = (i - 1) / 3;  // 0 vertical
+        int x = 160 + col;
+        int y = 80 + row;
+        
+        // Rotate capabilities: GPS, MOVEMENT_GROUND, SENSOR_CAMERA
+        RobotCapability cap = (i % 3 == 1) ? RobotCapability::SENSOR_GPS : 
+                              (i % 3 == 2) ? RobotCapability::MOVEMENT_GROUND : 
+                              RobotCapability::SENSOR_CAMERA;
+        
+        Robot* r = new Robot(i, "Rover_" + to_string(i), Point(x, y));
+        r->initializeCapabilities(13);
+        r->enableCapability(cap);
+        mrs->addRobot(r);
+    }
+    
+    cout << "✓ MultiRobotSystem created with 3 robots" << endl;
+}
+
+// ============================================================================
+//Create test environment with TS and GridWorld with 15 robots and 6 regions
+void createTestEnvironment12(TS*& ts, GridWorld*& grid, Environment*& env, MultiRobotSystem*& mrs) {
+// Allocate GridWorld
+    grid = new GridWorld(210, 210);
+    cout << "✓ GridWorld created (210x210)" << endl;
+    
+    // Allocate Transition System
+    ts = new TS();
+    
+    // Add 6 states 
+    Node* node0 = new Node(0, "R0");
+    Node* node1 = new Node(1, "R1");
+    Node* node2 = new Node(2, "R2");
+    Node* node3 = new Node(3, "R3");
+    Node* node4 = new Node(4, "R4");
+    Node* node5 = new Node(5, "R5");
+
+    //with edges: 0-2 1-2 2-3 2-4 2-5
+    node0->addEdge(Edge(2));
+    node2->addEdge(Edge(0));
+    node1->addEdge(Edge(2));
+    node2->addEdge(Edge(1));
+    node3->addEdge(Edge(2));
+    node2->addEdge(Edge(3));
+    node4->addEdge(Edge(2));
+    node2->addEdge(Edge(4));
+    node5->addEdge(Edge(2));
+    node2->addEdge(Edge(5));
+    
+    // Add nodes to TS
+    ts->add_Node(node0);
+    ts->add_Node(node1);
+    ts->add_Node(node2);
+    ts->add_Node(node3);
+    ts->add_Node(node4);
+    ts->add_Node(node5);
+    ts->setInitial(0);
+    
+    cout << "✓ Transition System created" << endl;
+    cout << "  - States: " << ts->getNumStates() << endl;
+    cout << "  - Initial state: 0" << endl;
+    
+    // Allocate Environment
+    env = new Environment(ts, grid);
+    cout << "✓ Environment created" << endl;
+    
+    // Map states to grid regions
+    env->mapTSStateToGrid(0, Point(180, 140), 60, 140);    // State 0 centered at (180,140)
+    env->mapTSStateToGrid(1, Point(180, 35), 60, 70);   // State 1 centered at (180,40)
+    env->mapTSStateToGrid(2, Point(120, 105), 60, 210);   // State 2 centered at (100,100)
+    env->mapTSStateToGrid(3, Point(45, 35), 90, 70);   // State 3 centered at (50,30)
+    env->mapTSStateToGrid(4, Point(45, 105), 90, 70);   // State 4 centered at (50,100)
+    env->mapTSStateToGrid(5, Point(45, 175), 90, 70);   // State 5 centered at (50,150)
+    cout << "✓ Mapped 6 states to grid regions" << endl;
+    
+    // Create MultiRobotSystem with 12 robots
+    mrs = new MultiRobotSystem();
+    
+    // Position 12 robots in a 3x4 grid, directly adjacent (1-unit spacing)
+    // Grid starts at (160, 80) in room 0
+    for (int i = 1; i <= 12; i++) {
+        int col = (i - 1) % 3;  // 0-2 horizontal
+        int row = (i - 1) / 3;  // 0-4 vertical
+        int x = 160 + col;
+        int y = 80 + row;
+        
+        // Rotate capabilities: GPS, MOVEMENT_GROUND, SENSOR_CAMERA
+        RobotCapability cap = (i % 3 == 1) ? RobotCapability::SENSOR_GPS : 
+                              (i % 3 == 2) ? RobotCapability::MOVEMENT_GROUND : 
+                              RobotCapability::SENSOR_CAMERA;
+        
+        Robot* r = new Robot(i, "Rover_" + to_string(i), Point(x, y));
+        r->initializeCapabilities(13);
+        r->enableCapability(cap);
+        mrs->addRobot(r);
+    }
+    
+    cout << "✓ MultiRobotSystem created with 12 robots" << endl;
+}
+
+
+// ============================================================================
+//Create test environment with TS and GridWorld with 15 robots and 6 regions
+void createTestEnvironment45(TS*& ts, GridWorld*& grid, Environment*& env, MultiRobotSystem*& mrs) {
+// Allocate GridWorld
+    grid = new GridWorld(210, 210);
+    cout << "✓ GridWorld created (210x210)" << endl;
+    
+    // Allocate Transition System
+    ts = new TS();
+    
+    // Add 6 states 
+    Node* node0 = new Node(0, "R0");
+    Node* node1 = new Node(1, "R1");
+    Node* node2 = new Node(2, "R2");
+    Node* node3 = new Node(3, "R3");
+    Node* node4 = new Node(4, "R4");
+    Node* node5 = new Node(5, "R5");
+
+    //with edges: 0-2 1-2 2-3 2-4 2-5
+    node0->addEdge(Edge(2));
+    node2->addEdge(Edge(0));
+    node1->addEdge(Edge(2));
+    node2->addEdge(Edge(1));
+    node3->addEdge(Edge(2));
+    node2->addEdge(Edge(3));
+    node4->addEdge(Edge(2));
+    node2->addEdge(Edge(4));
+    node5->addEdge(Edge(2));
+    node2->addEdge(Edge(5));
+    
+    // Add nodes to TS
+    ts->add_Node(node0);
+    ts->add_Node(node1);
+    ts->add_Node(node2);
+    ts->add_Node(node3);
+    ts->add_Node(node4);
+    ts->add_Node(node5);
+    ts->setInitial(0);
+    
+    cout << "✓ Transition System created" << endl;
+    cout << "  - States: " << ts->getNumStates() << endl;
+    cout << "  - Initial state: 0" << endl;
+    
+    // Allocate Environment
+    env = new Environment(ts, grid);
+    cout << "✓ Environment created" << endl;
+    
+    // Map states to grid regions
+    env->mapTSStateToGrid(0, Point(180, 140), 60, 140);    // State 0 centered at (180,140)
+    env->mapTSStateToGrid(1, Point(180, 35), 60, 70);   // State 1 centered at (180,40)
+    env->mapTSStateToGrid(2, Point(120, 105), 60, 210);   // State 2 centered at (100,100)
+    env->mapTSStateToGrid(3, Point(45, 35), 90, 70);   // State 3 centered at (50,30)
+    env->mapTSStateToGrid(4, Point(45, 105), 90, 70);   // State 4 centered at (50,100)
+    env->mapTSStateToGrid(5, Point(45, 175), 90, 70);   // State 5 centered at (50,150)
+    cout << "✓ Mapped 6 states to grid regions" << endl;
+    
+    // Create MultiRobotSystem with 15 robots
+    mrs = new MultiRobotSystem();
+    
+    // Position 45 robots in a 3x15 grid, directly adjacent (1-unit spacing)
+    // Grid starts at (160, 80) in room 0
+    for (int i = 1; i <= 45; i++) {
+        int col = (i - 1) % 3;  // 0-2 horizontal
+        int row = (i - 1) / 3;  // 0-14 vertical
+        int x = 160 + col;
+        int y = 80 + row;
+        
+        // Rotate capabilities: GPS, MOVEMENT_GROUND, SENSOR_CAMERA
+        RobotCapability cap = (i % 3 == 1) ? RobotCapability::SENSOR_GPS : 
+                              (i % 3 == 2) ? RobotCapability::MOVEMENT_GROUND : 
+                              RobotCapability::SENSOR_CAMERA;
+        
+        Robot* r = new Robot(i, "Rover_" + to_string(i), Point(x, y));
+        r->initializeCapabilities(13);
+        r->enableCapability(cap);
+        mrs->addRobot(r);
+    }
+    
+    cout << "✓ MultiRobotSystem created with 45 robots" << endl;
+}
+
+// ============================================================================
+//Create test environment with TS and GridWorld with 18 robots and 6 regions
+void createTestEnvironment18(TS*& ts, GridWorld*& grid, Environment*& env, MultiRobotSystem*& mrs) {
+    grid = new GridWorld(210, 210);
+    ts = new TS();
+    Node* node0 = new Node(0, "R0");
+    Node* node1 = new Node(1, "R1");
+    Node* node2 = new Node(2, "R2");
+    Node* node3 = new Node(3, "R3");
+    Node* node4 = new Node(4, "R4");
+    Node* node5 = new Node(5, "R5");
+    node0->addEdge(Edge(2)); node2->addEdge(Edge(0));
+    node1->addEdge(Edge(2)); node2->addEdge(Edge(1));
+    node3->addEdge(Edge(2)); node2->addEdge(Edge(3));
+    node4->addEdge(Edge(2)); node2->addEdge(Edge(4));
+    node5->addEdge(Edge(2)); node2->addEdge(Edge(5));
+    ts->add_Node(node0); ts->add_Node(node1); ts->add_Node(node2);
+    ts->add_Node(node3); ts->add_Node(node4); ts->add_Node(node5);
+    ts->setInitial(0);
+    
+    env = new Environment(ts, grid);
+    env->mapTSStateToGrid(0, Point(180, 140), 60, 140);
+    env->mapTSStateToGrid(1, Point(180, 35), 60, 70);
+    env->mapTSStateToGrid(2, Point(120, 105), 60, 210);
+    env->mapTSStateToGrid(3, Point(45, 35), 90, 70);
+    env->mapTSStateToGrid(4, Point(45, 105), 90, 70);
+    env->mapTSStateToGrid(5, Point(45, 175), 90, 70);
+    
+    mrs = new MultiRobotSystem();
+    for (int i = 1; i <= 18; i++) {
+        int col = (i - 1) % 3;
+        int row = (i - 1) / 3;
+        RobotCapability cap = (i % 3 == 1) ? RobotCapability::SENSOR_GPS : 
+                              (i % 3 == 2) ? RobotCapability::MOVEMENT_GROUND : 
+                              RobotCapability::SENSOR_CAMERA;
+        Robot* r = new Robot(i, "Rover_" + to_string(i), Point(160 + col, 80 + row));
+        r->initializeCapabilities(13);
+        r->enableCapability(cap);
+        mrs->addRobot(r);
+    }
+    cout << "✓ MultiRobotSystem created with 18 robots" << endl;
+}
+
+// ============================================================================
+//Create test environment with TS and GridWorld with 24 robots and 6 regions
+void createTestEnvironment24(TS*& ts, GridWorld*& grid, Environment*& env, MultiRobotSystem*& mrs) {
+    grid = new GridWorld(210, 210);
+    ts = new TS();
+    Node* node0 = new Node(0, "R0");
+    Node* node1 = new Node(1, "R1");
+    Node* node2 = new Node(2, "R2");
+    Node* node3 = new Node(3, "R3");
+    Node* node4 = new Node(4, "R4");
+    Node* node5 = new Node(5, "R5");
+    node0->addEdge(Edge(2)); node2->addEdge(Edge(0));
+    node1->addEdge(Edge(2)); node2->addEdge(Edge(1));
+    node3->addEdge(Edge(2)); node2->addEdge(Edge(3));
+    node4->addEdge(Edge(2)); node2->addEdge(Edge(4));
+    node5->addEdge(Edge(2)); node2->addEdge(Edge(5));
+    ts->add_Node(node0); ts->add_Node(node1); ts->add_Node(node2);
+    ts->add_Node(node3); ts->add_Node(node4); ts->add_Node(node5);
+    ts->setInitial(0);
+    
+    env = new Environment(ts, grid);
+    env->mapTSStateToGrid(0, Point(180, 140), 60, 140);
+    env->mapTSStateToGrid(1, Point(180, 35), 60, 70);
+    env->mapTSStateToGrid(2, Point(120, 105), 60, 210);
+    env->mapTSStateToGrid(3, Point(45, 35), 90, 70);
+    env->mapTSStateToGrid(4, Point(45, 105), 90, 70);
+    env->mapTSStateToGrid(5, Point(45, 175), 90, 70);
+    
+    mrs = new MultiRobotSystem();
+    for (int i = 1; i <= 24; i++) {
+        int col = (i - 1) % 3;
+        int row = (i - 1) / 3;
+        RobotCapability cap = (i % 3 == 1) ? RobotCapability::SENSOR_GPS : 
+                              (i % 3 == 2) ? RobotCapability::MOVEMENT_GROUND : 
+                              RobotCapability::SENSOR_CAMERA;
+        Robot* r = new Robot(i, "Rover_" + to_string(i), Point(160 + col, 80 + row));
+        r->initializeCapabilities(13);
+        r->enableCapability(cap);
+        mrs->addRobot(r);
+    }
+    cout << "✓ MultiRobotSystem created with 24 robots" << endl;
+}
+
+// ============================================================================
+//Create test environment with TS and GridWorld with 30 robots and 6 regions
+void createTestEnvironment30(TS*& ts, GridWorld*& grid, Environment*& env, MultiRobotSystem*& mrs) {
+    grid = new GridWorld(210, 210);
+    ts = new TS();
+    Node* node0 = new Node(0, "R0");
+    Node* node1 = new Node(1, "R1");
+    Node* node2 = new Node(2, "R2");
+    Node* node3 = new Node(3, "R3");
+    Node* node4 = new Node(4, "R4");
+    Node* node5 = new Node(5, "R5");
+    node0->addEdge(Edge(2)); node2->addEdge(Edge(0));
+    node1->addEdge(Edge(2)); node2->addEdge(Edge(1));
+    node3->addEdge(Edge(2)); node2->addEdge(Edge(3));
+    node4->addEdge(Edge(2)); node2->addEdge(Edge(4));
+    node5->addEdge(Edge(2)); node2->addEdge(Edge(5));
+    ts->add_Node(node0); ts->add_Node(node1); ts->add_Node(node2);
+    ts->add_Node(node3); ts->add_Node(node4); ts->add_Node(node5);
+    ts->setInitial(0);
+    
+    env = new Environment(ts, grid);
+    env->mapTSStateToGrid(0, Point(180, 140), 60, 140);
+    env->mapTSStateToGrid(1, Point(180, 35), 60, 70);
+    env->mapTSStateToGrid(2, Point(120, 105), 60, 210);
+    env->mapTSStateToGrid(3, Point(45, 35), 90, 70);
+    env->mapTSStateToGrid(4, Point(45, 105), 90, 70);
+    env->mapTSStateToGrid(5, Point(45, 175), 90, 70);
+    
+    mrs = new MultiRobotSystem();
+    for (int i = 1; i <= 30; i++) {
+        int col = (i - 1) % 3;
+        int row = (i - 1) / 3;
+        RobotCapability cap = (i % 3 == 1) ? RobotCapability::SENSOR_GPS : 
+                              (i % 3 == 2) ? RobotCapability::MOVEMENT_GROUND : 
+                              RobotCapability::SENSOR_CAMERA;
+        Robot* r = new Robot(i, "Rover_" + to_string(i), Point(160 + col, 80 + row));
+        r->initializeCapabilities(13);
+        r->enableCapability(cap);
+        mrs->addRobot(r);
+    }
+    cout << "✓ MultiRobotSystem created with 30 robots" << endl;
+}
+
+// ============================================================================
+//Create test environment with TS and GridWorld with 36 robots and 6 regions
+void createTestEnvironment36(TS*& ts, GridWorld*& grid, Environment*& env, MultiRobotSystem*& mrs) {
+    grid = new GridWorld(210, 210);
+    ts = new TS();
+    Node* node0 = new Node(0, "R0");
+    Node* node1 = new Node(1, "R1");
+    Node* node2 = new Node(2, "R2");
+    Node* node3 = new Node(3, "R3");
+    Node* node4 = new Node(4, "R4");
+    Node* node5 = new Node(5, "R5");
+    node0->addEdge(Edge(2)); node2->addEdge(Edge(0));
+    node1->addEdge(Edge(2)); node2->addEdge(Edge(1));
+    node3->addEdge(Edge(2)); node2->addEdge(Edge(3));
+    node4->addEdge(Edge(2)); node2->addEdge(Edge(4));
+    node5->addEdge(Edge(2)); node2->addEdge(Edge(5));
+    ts->add_Node(node0); ts->add_Node(node1); ts->add_Node(node2);
+    ts->add_Node(node3); ts->add_Node(node4); ts->add_Node(node5);
+    ts->setInitial(0);
+    
+    env = new Environment(ts, grid);
+    env->mapTSStateToGrid(0, Point(180, 140), 60, 140);
+    env->mapTSStateToGrid(1, Point(180, 35), 60, 70);
+    env->mapTSStateToGrid(2, Point(120, 105), 60, 210);
+    env->mapTSStateToGrid(3, Point(45, 35), 90, 70);
+    env->mapTSStateToGrid(4, Point(45, 105), 90, 70);
+    env->mapTSStateToGrid(5, Point(45, 175), 90, 70);
+    
+    mrs = new MultiRobotSystem();
+    for (int i = 1; i <= 36; i++) {
+        int col = (i - 1) % 3;
+        int row = (i - 1) / 3;
+        RobotCapability cap = (i % 3 == 1) ? RobotCapability::SENSOR_GPS : 
+                              (i % 3 == 2) ? RobotCapability::MOVEMENT_GROUND : 
+                              RobotCapability::SENSOR_CAMERA;
+        Robot* r = new Robot(i, "Rover_" + to_string(i), Point(160 + col, 80 + row));
+        r->initializeCapabilities(13);
+        r->enableCapability(cap);
+        mrs->addRobot(r);
+    }
+    cout << "✓ MultiRobotSystem created with 36 robots" << endl;
 }
 

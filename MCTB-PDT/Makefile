@@ -19,6 +19,10 @@ INTERTASK_BIN = $(OUT_DIR)/InterTaskConstraintTests
 MULTICAP_BIN = $(OUT_DIR)/MultiCapabilityRobotTest
 AUTOMATON_STATES_BIN = $(OUT_DIR)/AutomatonStatesTest
 AUTOMATON_STATES_BATCH_BIN = $(OUT_DIR)/AutomatonStatesBatchTest
+NUMBER_ROBOTS_BIN = $(OUT_DIR)/NumberRobotsTest
+TS_REGIONS_BIN = $(OUT_DIR)/TransitionSystemRegionsTest
+AVG_CAPS_BIN = $(OUT_DIR)/AverageCapabilitiesTest
+ROBOT_HOMOGENEITY_BIN = $(OUT_DIR)/RobotHomogeneityTest
 
 # Source files
 TEST_SRC = apps/TestIntegration.cpp
@@ -32,6 +36,10 @@ INTERTASK_SRC = apps/Inter_task_constraint_tests.cpp
 MULTICAP_SRC = apps/Multi_Capability_Robot_Test.cpp
 AUTOMATON_STATES_SRC = organizedtests/automaton_states/test_automaton_states.cpp
 AUTOMATON_STATES_BATCH_SRC = organizedtests/automaton_states_batch/test_automaton_states_batch.cpp
+NUMBER_ROBOTS_SRC = organizedtests/number_robots/test_number_robots.cpp
+TS_REGIONS_SRC = organizedtests/transition_system_regions/test_transition_system_regions.cpp
+AVG_CAPS_SRC = organizedtests/average_capabilities/test_average_capabilities.cpp
+ROBOT_HOMOGENEITY_SRC = organizedtests/robot_homogeneity/test_robot_homogeneity.cpp
 # GridVis - only included in visualization targets
 GRIDVIS_SRC = src/Environment/gridvis.cpp
 # TaskAllocationAlgorithms - algorithms for task allocation
@@ -67,15 +75,19 @@ INTERTASK_OBJ = $(INTERTASK_SRC:.cpp=.o)
 MULTICAP_OBJ = $(MULTICAP_SRC:.cpp=.o)
 AUTOMATON_STATES_OBJ = $(AUTOMATON_STATES_SRC:.cpp=.o)
 AUTOMATON_STATES_BATCH_OBJ = $(AUTOMATON_STATES_BATCH_SRC:.cpp=.o)
+NUMBER_ROBOTS_OBJ = $(NUMBER_ROBOTS_SRC:.cpp=.o)
+TS_REGIONS_OBJ = $(TS_REGIONS_SRC:.cpp=.o)
+AVG_CAPS_OBJ = $(AVG_CAPS_SRC:.cpp=.o)
+ROBOT_HOMOGENEITY_OBJ = $(ROBOT_HOMOGENEITY_SRC:.cpp=.o)
 GRIDVIS_OBJ = $(GRIDVIS_SRC:.cpp=.o)
 COMMON_OBJS = $(COMMON_SRCS:.cpp=.o)
 TASK_ALLOC_OBJS = $(TASK_ALLOC_SRCS:.cpp=.o)
-ALL_OBJS = $(TEST_OBJ) $(TREE_TEST_OBJ) $(TASK_ALLOC_OBJ) $(PLANNING_TREE_TEST_OBJ) $(OPTIMAL_PATH_OBJ) $(DSTAR_OBJ) $(VIS_OBJ) $(INTERTASK_OBJ) $(MULTICAP_OBJ) $(AUTOMATON_STATES_OBJ) $(AUTOMATON_STATES_BATCH_OBJ) $(GRIDVIS_OBJ) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
+ALL_OBJS = $(TEST_OBJ) $(TREE_TEST_OBJ) $(TASK_ALLOC_OBJ) $(PLANNING_TREE_TEST_OBJ) $(OPTIMAL_PATH_OBJ) $(DSTAR_OBJ) $(VIS_OBJ) $(INTERTASK_OBJ) $(MULTICAP_OBJ) $(AUTOMATON_STATES_OBJ) $(AUTOMATON_STATES_BATCH_OBJ) $(NUMBER_ROBOTS_OBJ) $(TS_REGIONS_OBJ) $(AVG_CAPS_OBJ) $(ROBOT_HOMOGENEITY_OBJ) $(GRIDVIS_OBJ) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
 
 # Targets
-.PHONY: all clean run rebuild help test test-tree test-task test-planning-tree test-optimal-path test-dstar test-intertask test-multicap test-automaton-states test-automaton-states-batch test-all tree-only task-only planning-tree-only optimal-path-only dstar-only intertask-only multicap-only automaton-states-only automaton-states-batch-only vis vis-only
+.PHONY: all clean run rebuild help test test-tree test-task test-planning-tree test-optimal-path test-dstar test-intertask test-multicap test-automaton-states test-automaton-states-batch test-number-robots test-ts-regions test-average-capabilities test-robot-homogeneity test-all tree-only task-only planning-tree-only optimal-path-only dstar-only intertask-only multicap-only automaton-states-only automaton-states-batch-only number-robots-only ts-regions-only average-capabilities-only robot-homogeneity-only vis vis-only
 
-all: $(OUT_BIN) $(TREE_BIN) $(TASK_ALLOC_BIN) $(PLANNING_TREE_BIN) $(OPTIMAL_PATH_BIN) $(DSTAR_BIN) $(INTERTASK_BIN) $(MULTICAP_BIN) $(AUTOMATON_STATES_BIN) $(AUTOMATON_STATES_BATCH_BIN) $(VIS_BIN)
+all: $(OUT_BIN) $(TREE_BIN) $(TASK_ALLOC_BIN) $(PLANNING_TREE_BIN) $(OPTIMAL_PATH_BIN) $(DSTAR_BIN) $(INTERTASK_BIN) $(MULTICAP_BIN) $(AUTOMATON_STATES_BIN) $(AUTOMATON_STATES_BATCH_BIN) $(NUMBER_ROBOTS_BIN) $(TS_REGIONS_BIN) $(AVG_CAPS_BIN) $(ROBOT_HOMOGENEITY_BIN) $(VIS_BIN)
 
 # Build the test executable
 $(OUT_BIN): $(TEST_OBJ) $(COMMON_OBJS)
@@ -137,6 +149,30 @@ $(AUTOMATON_STATES_BATCH_BIN): $(AUTOMATON_STATES_BATCH_OBJ) $(COMMON_OBJS) $(TA
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $^ -o $@ $(LIBS)
 	@echo "✓ Build successful: $(AUTOMATON_STATES_BATCH_BIN)"
 
+# Build the number robots scaling tests executable
+$(NUMBER_ROBOTS_BIN): $(NUMBER_ROBOTS_OBJ) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
+	@mkdir -p $(OUT_DIR)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $^ -o $@ $(LIBS)
+	@echo "✓ Build successful: $(NUMBER_ROBOTS_BIN)"
+
+# Build the transition system regions scaling tests executable
+$(TS_REGIONS_BIN): $(TS_REGIONS_OBJ) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
+	@mkdir -p $(OUT_DIR)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $^ -o $@ $(LIBS)
+	@echo "✓ Build successful: $(TS_REGIONS_BIN)"
+
+# Build the average capabilities scaling tests executable
+$(AVG_CAPS_BIN): $(AVG_CAPS_OBJ) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
+	@mkdir -p $(OUT_DIR)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $^ -o $@ $(LIBS)
+	@echo "✓ Build successful: $(AVG_CAPS_BIN)"
+
+# Build the robot homogeneity scaling tests executable
+$(ROBOT_HOMOGENEITY_BIN): $(ROBOT_HOMOGENEITY_OBJ) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
+	@mkdir -p $(OUT_DIR)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $^ -o $@ $(LIBS)
+	@echo "✓ Build successful: $(ROBOT_HOMOGENEITY_BIN)"
+
 # Build the visualization executable
 $(VIS_BIN): $(VIS_OBJ) $(GRIDVIS_OBJ) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
 	@mkdir -p $(OUT_DIR)
@@ -197,6 +233,26 @@ test-automaton-states-batch: $(AUTOMATON_STATES_BATCH_BIN)
 	@echo "Running automaton states batch scaling tests..."
 	@cd organizedtests/automaton_states_batch && ../../$(AUTOMATON_STATES_BATCH_BIN)
 
+# Run number robots scaling tests
+test-number-robots: $(NUMBER_ROBOTS_BIN)
+	@echo "Running number robots scaling tests..."
+	@cd organizedtests/number_robots && ../../$(NUMBER_ROBOTS_BIN)
+
+# Run transition system regions scaling tests
+test-ts-regions: $(TS_REGIONS_BIN)
+	@echo "Running transition system regions scaling tests..."
+	@cd organizedtests/transition_system_regions && ../../$(TS_REGIONS_BIN)
+
+# Run average capabilities scaling tests
+test-average-capabilities: $(AVG_CAPS_BIN)
+	@echo "Running average capabilities scaling tests..."
+	@cd organizedtests/average_capabilities && ../../$(AVG_CAPS_BIN)
+
+# Run robot homogeneity scaling tests
+test-robot-homogeneity: $(ROBOT_HOMOGENEITY_BIN)
+	@echo "Running robot homogeneity scaling tests..."
+	@cd organizedtests/robot_homogeneity && ../../$(ROBOT_HOMOGENEITY_BIN)
+
 # Shortcut to run only tree tests
 tree-only: test-tree
 
@@ -224,6 +280,18 @@ automaton-states-only: test-automaton-states
 # Shortcut to run only automaton states batch tests
 automaton-states-batch-only: test-automaton-states-batch
 
+# Shortcut to run only number robots tests
+number-robots-only: test-number-robots
+
+# Shortcut to run only transition system regions tests
+ts-regions-only: test-ts-regions
+
+# Shortcut to run only average capabilities tests
+average-capabilities-only: test-average-capabilities
+
+# Shortcut to run only robot homogeneity tests
+robot-homogeneity-only: test-robot-homogeneity
+
 # Run visualization
 vis: $(VIS_BIN)
 	@echo "Running visualization..."
@@ -234,7 +302,7 @@ vis-only: $(VIS_BIN)
 	@echo "✓ Visualization built. Run 'make vis' to execute."
 
 # Run all tests
-test-all: run test-tree test-task test-planning-tree test-optimal-path test-dstar test-intertask test-multicap test-automaton-states test-automaton-states-batch
+test-all: test-tree test-task test-planning-tree test-optimal-path test-dstar test-intertask test-multicap test-automaton-states test-automaton-states-batch test-number-robots test-ts-regions test-average-capabilities test-robot-homogeneity
 
 # Run tests and show output
 test: test-all
@@ -264,6 +332,7 @@ help:
 	@echo "  make test-dstar          - Build and run D* GridWorld algorithm tests"
 	@echo "  make test-intertask      - Build and run inter-task constraint tests"
 	@echo "  make test-automaton-states - Build and run automaton states scaling tests"
+	@echo "  make test-number-robots  - Build and run number robots scaling tests"
 	@echo "  make vis                 - Build and run visualization app (requires raylib)"
 	@echo "  make vis-only            - Build only visualization executable"
 	@echo "  make tree-only           - Shortcut for 'make test-tree'"
@@ -272,6 +341,7 @@ help:
 	@echo "  make optimal-path-only   - Shortcut for 'make test-optimal-path'"
 	@echo "  make intertask-only      - Shortcut for 'make test-intertask'"
 	@echo "  make automaton-states-only - Shortcut for 'make test-automaton-states'"
+	@echo "  make number-robots-only  - Shortcut for 'make test-number-robots'"
 	@echo "  make dstar-only          - Shortcut for 'make test-dstar'"
 	@echo "  make test                - Run all tests"
 	@echo "  make test-all            - Run all tests (explicit)"

@@ -24,10 +24,10 @@ class TestRunManager {
 public:
     // ==================== TEST CATEGORIES ====================
     enum class TestCategory {
-        AUTOMATON_STATES,           // 5-150 states
+        AUTOMATON_STATES,           // 3-256 states
         AUTOMATON_STATES_BATCH,     // 16 automata with 4 batch configurations
-        NUM_ROBOTS,                 // 3-20 robots
-        TS_REGIONS,                 // 5-40 regions
+        NUM_ROBOTS,                 // 3-45 robots
+        TS_REGIONS,                 // 6-40 regions
         AVG_CAPABILITIES,           // 1-5 avg capabilities
         ROBOT_HOMOGENEITY           // 0.2-3 homogeneity
     };
@@ -84,7 +84,7 @@ public:
     // ==================== EXPORT FOR ANALYSIS ====================
     
     // Export separate CSV for each input configuration
-    void exportByConfiguration(const std::string& output_dir = "data") const;
+    void exportByConfiguration(const std::string& output_dir = "data", const std::string& independent_var = "automaton_id") const;
     
     // Export aggregated statistics
     void exportStatisticsToCSV(const std::string& output_filename) const;

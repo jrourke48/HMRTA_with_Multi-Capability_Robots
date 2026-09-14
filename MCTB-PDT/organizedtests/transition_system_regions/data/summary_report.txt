@@ -1,0 +1,11 @@
+# Test Run Summary Report
+
+## ts_regions
+**Status**: 64 / 64 runs (100.0%)
+
+| Metric | Value |
+|--------|-------|
+| Average Computation Time | 9.0 ms |
+| Last Run Timestamp | 2026-09-13 21:46:22 |
+| Total Runs | 64 |
+

@@ -36,7 +36,7 @@ public:
     ProductAutomaton(const Environment& env, const MultiRobotSystem& mrs, const BuchiAutomaton& buchiAutomaton);
     
     // Compute the optimal accepting path starting from the given state
-    std::vector<uint16_t> OptimalAcceptingPath();
+    std::tuple<std::vector<uint16_t>, uint32_t> OptimalAcceptingPath();
     
     ~ProductAutomaton() override;
 
