@@ -156,7 +156,7 @@ std::vector<TestRunManager::RunStatistics> TestRunManager::getStatistics() const
 
 // ==================== EXPORT FOR ANALYSIS ====================
 
-void TestRunManager::exportByConfiguration(const std::string& output_dir) const {
+void TestRunManager::exportByConfiguration(const std::string& output_dir, const std::string& independent_var) const {
     if (runs_.empty()) {
         std::cerr << "⚠ No runs to export for category: " << getCategoryName() << std::endl;
         return;
@@ -170,7 +170,7 @@ void TestRunManager::exportByConfiguration(const std::string& output_dir) const 
         // Create parameter set excluding independent variable
         std::map<std::string, std::string> grouping_params;
         for (const auto& [key, value] : run.parameters) {
-            if (key != "automaton_id") {  // Exclude the independent variable
+            if (key != independent_var) {  // Exclude the independent variable
                 grouping_params[key] = value;
             }
         }
@@ -209,11 +209,14 @@ void TestRunManager::exportByConfiguration(const std::string& output_dir) const 
             out << "," << key;
         }
         
-        out << ",num_automaton_states,num_automaton_edges,num_robots,num_ts_regions,"
-            << "total_computation_time_ms,total_nodes_planning,total_nodes_traversed,"
-            << "total_nodes_pruned,nodes_satisfying_ltl,task_allocation_memory_bytes,"
-            << "product_automaton_memory_bytes,product_automaton_nodes,product_automaton_edges,"
-            << "pruning_ratio,explored_product_ratio,tree_makespan_seconds,robots_utilized,"
+        out << ",num_automaton_states,num_automaton_edges,total_required_capabilities,"
+            << "independent_required_capabilities,num_robots,total_robot_capabilities,"
+            << "independent_robot_capabilities,avg_capabilities_per_robot,capability_homogeneity,"
+            << "num_ts_regions,total_nodes_planning,total_nodes_traversed,total_nodes_pruned,"
+            << "nodes_satisfying_ltl,pruning_ratio,full_product_automaton_nodes,"
+            << "full_product_automaton_edges,explored_product_ratio,task_allocation_algorithm_memory_MB,"
+            << "full_product_automaton_memory_MB,total_computation_time_ms,product_computation_time_ms,"
+            << "tree_makespan_seconds,product_makespan_seconds,robots_utilized,"
             << "robot_utilization_ratio,load_balance_variance\n";
         
         // Write data for this configuration
@@ -235,20 +238,28 @@ void TestRunManager::exportByConfiguration(const std::string& output_dir) const 
             
             out << "," << iv.num_automaton_states
                 << "," << iv.num_automaton_edges
+                << "," << iv.total_required_capabilities
+                << "," << iv.independent_required_capabilities
                 << "," << iv.num_robots
+                << "," << iv.total_robot_capabilities
+                << "," << iv.independent_robot_capabilities
+                << "," << iv.avg_capabilities_per_robot
+                << "," << iv.capability_homogeneity
                 << "," << iv.num_ts_regions
-                << "," << metrics.total_computation_time_ms
                 << "," << efficiency.total_nodes_planning
                 << "," << efficiency.total_nodes_traversed
                 << "," << efficiency.total_nodes_pruned
                 << "," << efficiency.nodes_satisfying_ltl
-                << "," << efficiency.task_allocation_algorithm_memory_bytes
-                << "," << efficiency.full_product_automaton_memory_bytes
+                << "," << efficiency.pruning_ratio
                 << "," << efficiency.full_product_automaton_nodes
                 << "," << efficiency.full_product_automaton_edges
-                << "," << efficiency.pruning_ratio
                 << "," << efficiency.explored_product_ratio
+                << "," << efficiency.task_allocation_algorithm_memory_MB
+                << "," << efficiency.full_product_automaton_memory_MB
+                << "," << metrics.total_computation_time_ms
+                << "," << metrics.product_computation_time_ms
                 << "," << quality.tree_makespan_seconds
+                << "," << quality.product_makespan_seconds
                 << "," << quality.robots_utilized
                 << "," << quality.robot_utilization_ratio
                 << "," << quality.load_balance_variance
@@ -345,11 +356,12 @@ void TestRunManager::exportSummaryReport(const std::string& output_filename) con
 
 int TestRunManager::getExpectedNumberOfRuns() const {
     switch (category_) {
-        case TestCategory::AUTOMATON_STATES:   return 44;  // 11 automata × 4 robot configs
-        case TestCategory::NUM_ROBOTS:         return 8;   // 3-20 robots
-        case TestCategory::TS_REGIONS:         return 10;  // 5-40 regions
-        case TestCategory::AVG_CAPABILITIES:   return 10;  // 1-5 avg cap
-        case TestCategory::ROBOT_HOMOGENEITY:  return 10;  // 0.2-3 homogeneity
+        case TestCategory::AUTOMATON_STATES:   return 64;  // 16 automata × 4 robot configs
+        case TestCategory::AUTOMATON_STATES_BATCH: return 64;  // 16 automata × 4 robot configs
+        case TestCategory::NUM_ROBOTS:         return 64;  // 8 automata × 8 robot counts
+        case TestCategory::TS_REGIONS:         return 64;  // 8 automata × 8 region counts
+        case TestCategory::AVG_CAPABILITIES:   return 80;  // 1-5 avg cap
+        case TestCategory::ROBOT_HOMOGENEITY:  return 80;  // 0.2-3 homogeneity
         default: return 0;
     }
 }

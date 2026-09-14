@@ -16,18 +16,21 @@ Want to try to get as comprehensive of an idea of the algorithms behavior withou
 ## variable ranges and number of tests
 We are going to run tests for 3, 6, 15 and 45 robot configuration 6 regions and maybe 3 different buchis for every scenario where those variables are not involved
 ### Number of automaton states
-try 15 different state numbers: 5-150 states
+try 15 different state numbers: 3-256 states
+### Number of automaton states batch
+We are going to run tests for unrelated, compatible, exclusive, and mixed APs for each Automaton
+try 15 different state numbers: 3-256 states
 ### Number of robots
-try 8 different numbers of robots: 3-20
+try 8 different numbers of robots: 3-45: 3,6,12,18,24,30,36,45
 ### regions of transition system
-try 10 different transition system partitions: 5-40 states
-Other possible tests 
+try 8 different transition system partitions: 6-40 states
 ### average capabilities
 try 10 different average capabilities: 1-5
 ### robot Homogenity
-try 10 different robot Homogenity: 0.2-3
+try 8 different robot Homogeniety: 0.2-4 0.2,0.6,1,1.4,1.8,2.2,2.6,3
 
 Need a way to store all the data and plot it in simueltaneusly
 
 
 
+Lets look at the same thing for required capabilities in the AP

@@ -39,6 +39,8 @@ public:
     std::vector<BatchAtomicProposition>& getBatchAtomicPropositions();
     const std::vector<BatchAtomicProposition>& getBatchAtomicPropositions() const;
     std::vector<BatchAtomicProposition>& getAtomicPropositions();
+    uint16_t getTotalRequiredCapabilities() const;
+    uint16_t getIndependentRequiredCapabilities() const;
     void addBatchAtomicProposition(const BatchAtomicProposition& ap);
     int8_t getBatchVal(uint16_t apId) const;
 

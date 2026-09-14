@@ -8,6 +8,10 @@
 #include <functional>
 #include "TarjansAlgorithm.cpp"
 #include <spot/twaalgos/dot.hh>
+#include <iostream>
+#include <vector>
+#include <climits>
+using namespace std;
 
 ProductAutomaton::ProductAutomaton() {
 }
@@ -71,9 +75,8 @@ ProductAutomaton::ProductAutomaton(const Environment& env, const MultiRobotSyste
                 } 
             }
             uint16_t AP = batchAP.getAP();
-            if (!hasMatchingCapability || ts_r.isInitial(AP)) {
+            if (!hasMatchingCapability && AP != 0) {
                 ts_r.removeNode(AP);
-                std::cout << "Robot " << static_cast<int>(r) << " does not have the required capabilities for AP " << AP << std::endl;
             }
         }
         
@@ -82,9 +85,6 @@ ProductAutomaton::ProductAutomaton(const Environment& env, const MultiRobotSyste
         for (const auto& nodePair : ts_r.getNodes()) {
             remainingStates.push_back(nodePair.first);
         }
-        std::cout << "Robot " << static_cast<int>(r) << " remaining states: ";
-        for (uint16_t s : remainingStates) std::cout << s << " ";
-        std::cout << std::endl;
         
         robotStates.push_back(remainingStates);
         allRobotTS.push_back(ts_r);  // Store for later use in transition building
@@ -171,180 +171,220 @@ ProductAutomaton::ProductAutomaton(const Environment& env, const MultiRobotSyste
     // This will use the stateMapping we just populated above
     std::ostringstream dotStream;
     spot::print_dot(dotStream, productSpot);
-    parseProductFromDot(dotStream.str());
+    parseProductFromDot(dotStream.str(), env, mrs);
 }
 
-std::vector<uint16_t> ProductAutomaton::OptimalAcceptingPath() {
-    std::vector<uint16_t> result;
-    
-    if (nodeMap.empty() || acceptingStates.empty()) return result;
-    
-    // Step 1: Create mapping from node IDs to indices for Tarjan
-    std::vector<uint16_t> indexToNodeId;
-    std::map<uint16_t, int> nodeIdToIndex;
-    
-    for (const auto& pair : nodeMap) {
-        nodeIdToIndex[pair.first] = indexToNodeId.size();
-        indexToNodeId.push_back(pair.first);
+// Returns the optimal accepting path and its cumulative cost in the product automaton using a modified Dijkstra's algorithm.
+// For Product automata: finds path with 2 loops to accepting state, then one additional node.
+std::tuple<std::vector<uint16_t>, uint32_t> ProductAutomaton::OptimalAcceptingPath() {
+    // Check if the product automaton has any accepting states
+    if (acceptingStates.empty()) {
+        std::cerr << "No accepting states in the product automaton!" << std::endl;
+        return std::make_tuple(std::vector<uint16_t>(), UINT32_MAX);
     }
-    
+
+    if (nodeMap.empty()) {
+        std::cerr << "Product automaton is empty!" << std::endl;
+        return std::make_tuple(std::vector<uint16_t>(), UINT32_MAX);
+    }
+
+    // Map node IDs to indices for distance tracking
+    std::map<uint16_t, int> nodeIdToIndex;
+    std::vector<uint16_t> indexToNodeId;
+    int idx = 0;
+    for (const auto& pair : nodeMap) {
+        nodeIdToIndex[pair.first] = idx;
+        indexToNodeId.push_back(pair.first);
+        idx++;
+    }
+
     int numNodes = indexToNodeId.size();
     
-    // Step 2: Build adjacency list and edge weights
-    std::vector<std::vector<int>> adj(numNodes);
-    std::vector<std::vector<std::pair<int, uint16_t>>> weightedAdj(numNodes);  // {neighbor, weight}
-    
-    for (int i = 0; i < numNodes; ++i) {
-        uint16_t nodeId = indexToNodeId[i];
-        Node* node = nodeMap[nodeId];
-        
-        for (const auto& edge : node->getEdges()) {
-            uint16_t destId = edge.getDstId();
-            int destIndex = nodeIdToIndex[destId];
-            adj[i].push_back(destIndex);
-            weightedAdj[i].push_back({destIndex, edge.getWeight()});
-        }
-    }
-    
-    // Step 3: Run Tarjan's algorithm to find all SCCs
-    std::vector<std::vector<int>> sccs = getSCCs(adj);
-    
-    // Step 4: Identify which SCCs contain accepting states
-    std::map<int, bool> sccHasAccepting;
-    std::map<int, int> nodeIndexToSccId;
-    
-    for (int sccIdx = 0; sccIdx < static_cast<int>(sccs.size()); ++sccIdx) {
-        sccHasAccepting[sccIdx] = false;
-        for (int nodeIdx : sccs[sccIdx]) {
-            nodeIndexToSccId[nodeIdx] = sccIdx;
-            uint16_t nodeId = indexToNodeId[nodeIdx];
-            
-            if (std::find(acceptingStates.begin(), acceptingStates.end(), nodeId) != acceptingStates.end()) {
-                sccHasAccepting[sccIdx] = true;
-            }
-        }
-    }
-    
-    // Step 5: Use Dijkstra's algorithm to find minimum cost path to accepting SCC
-    uint16_t initialState = 0;
-    int initialStateIdx = nodeIdToIndex[initialState];
-    
-    std::vector<uint32_t> dist(numNodes, UINT32_MAX);
-    std::vector<int> parent(numNodes, -1);
-    std::priority_queue<std::pair<uint32_t, int>, std::vector<std::pair<uint32_t, int>>, std::greater<>> pq;
-    
-    dist[initialStateIdx] = 0;
-    pq.push({0, initialStateIdx});
-    
-    int targetStateIdx = -1;
-    int targetSccId = -1;
-    
-    while (!pq.empty()) {
-        auto [currDist, currIdx] = pq.top();
-        pq.pop();
-        
-        if (currDist > dist[currIdx]) continue;
-        
-        // Check if this state's SCC has accepting states
-        int currSccId = nodeIndexToSccId[currIdx];
-        if (sccHasAccepting[currSccId]) {
-            targetStateIdx = currIdx;
-            targetSccId = currSccId;
-            break;
-        }
-        
-        // Explore neighbors with weights
-        for (const auto& [neighbor, weight] : weightedAdj[currIdx]) {
-            if (dist[currIdx] != UINT32_MAX && dist[currIdx] + weight < dist[neighbor]) {
-                dist[neighbor] = dist[currIdx] + weight;
-                parent[neighbor] = currIdx;
-                pq.push({dist[neighbor], neighbor});
-            }
-        }
-    }
-    
-    if (targetStateIdx == -1) return result;
-    
-    // Step 6: Reconstruct minimum cost path to target
-    std::vector<uint16_t> pathToAccepting;
-    int current = targetStateIdx;
-    while (current != -1) {
-        pathToAccepting.insert(pathToAccepting.begin(), indexToNodeId[current]);
-        current = parent[current];
-    }
-    
-    // Step 7: Find minimum cost cycle within the SCC containing an accepting state
-    // Using Dijkstra from the target node within the SCC
-    std::vector<uint32_t> cycleDist(numNodes, UINT32_MAX);
-    std::vector<int> cycleParent(numNodes, -1);
-    std::priority_queue<std::pair<uint32_t, int>, std::vector<std::pair<uint32_t, int>>, std::greater<>> cyclePq;
-    
-    cycleDist[targetStateIdx] = 0;
-    cyclePq.push({0, targetStateIdx});
-    
-    uint32_t minCycleCost = UINT32_MAX;
-    int cycleReturnNode = -1;
-    
-    while (!cyclePq.empty()) {
-        auto [currDist, currIdx] = cyclePq.top();
-        cyclePq.pop();
-        
-        if (currDist > cycleDist[currIdx]) continue;
-        
-        // Check if we can return to target node (forming a cycle)
-        for (const auto& [neighbor, weight] : weightedAdj[currIdx]) {
-            if (neighbor == targetStateIdx && nodeIndexToSccId[currIdx] == targetSccId) {
-                uint32_t totalCycleCost = currDist + weight;
-                if (totalCycleCost < minCycleCost) {
-                    minCycleCost = totalCycleCost;
-                    cycleReturnNode = currIdx;
+    // Helper lambda: Dijkstra from a specific start node to find accepting state
+    // If skipStartNode=true, skips the starting node and finds a different accepting state
+    // Returns: (targetIdx, parents, distances)
+    auto dijkstraToAccepting = [&](int startIdx, bool skipStartNode = false) -> std::tuple<int, std::vector<int>, std::vector<uint32_t>> {
+        std::vector<uint32_t> dist(numNodes, UINT32_MAX);
+        std::vector<int> parent(numNodes, -1);
+        std::priority_queue<std::pair<uint32_t, int>, std::vector<std::pair<uint32_t, int>>, std::greater<>> pq;
+
+        dist[startIdx] = 0;
+        pq.push({0, startIdx});
+
+        int targetIdx = -1;
+        bool firstIteration = true;
+
+        while (!pq.empty()) {
+            auto [currDist, currIdx] = pq.top();
+            pq.pop();
+
+            if (currDist > dist[currIdx])
+                continue;
+
+            // Check if current node is accepting (but skip start node if requested)
+            uint16_t currNodeId = indexToNodeId[currIdx];
+            if (!firstIteration || !skipStartNode) {  // Allow start node on first iteration only if skipStartNode=false
+                if (std::find(acceptingStates.begin(), acceptingStates.end(), currNodeId) != acceptingStates.end()) {
+                    targetIdx = currIdx;
+                    break;  // Found accepting state
                 }
             }
-            
-            // Only explore within SCC
-            if (nodeIndexToSccId[neighbor] == targetSccId && 
-                cycleDist[currIdx] != UINT32_MAX && 
-                cycleDist[currIdx] + weight < cycleDist[neighbor]) {
-                cycleDist[neighbor] = cycleDist[currIdx] + weight;
-                cycleParent[neighbor] = currIdx;
-                cyclePq.push({cycleDist[neighbor], neighbor});
+            firstIteration = false;
+
+            // Explore neighbors
+            Node* currNode = nodeMap[currNodeId];
+            if (currNode) {
+                for (const auto& edge : currNode->getEdges()) {
+                    uint16_t neighborNodeId = edge.getDstId();
+                    if (nodeIdToIndex.find(neighborNodeId) == nodeIdToIndex.end())
+                        continue;
+
+                    int neighborIdx = nodeIdToIndex[neighborNodeId];
+                    uint32_t edgeWeight = edge.getWeight();
+
+                    if (dist[currIdx] != UINT32_MAX && dist[currIdx] + edgeWeight < dist[neighborIdx]) {
+                        dist[neighborIdx] = dist[currIdx] + edgeWeight;
+                        parent[neighborIdx] = currIdx;
+                        pq.push({dist[neighborIdx], neighborIdx});
+                    }
+                }
             }
         }
-    }
-    
-    // Step 8: Reconstruct minimum cost cycle
-    std::vector<uint16_t> cycle;
-    if (cycleReturnNode != -1) {
-        int current = cycleReturnNode;
-        while (current != -1 && current != targetStateIdx) {
-            cycle.insert(cycle.begin(), indexToNodeId[current]);
-            current = cycleParent[current];
-        }
-        cycle.insert(cycle.begin(), indexToNodeId[targetStateIdx]);
-    }
-    
-    // Step 9: Build final result with minimum cost path + minimum cost cycle
-    for (uint16_t s : pathToAccepting) {
-        result.push_back(s);
-    }
-    
-    if (!cycle.empty()) {
-        // Add minimum cost cycle 3 times to show repeating pattern
-        for (int rep = 0; rep < 3; rep++) {
-            for (size_t i = 1; i < cycle.size(); ++i) {  // Skip first node to avoid duplication
-                result.push_back(cycle[i]);
+
+        return {targetIdx, parent, dist};
+    };
+
+    // Helper lambda: get next node from current
+    auto getNextNode = [&](int currIdx) -> int {
+        Node* currNode = nodeMap[indexToNodeId[currIdx]];
+        if (currNode && !currNode->getEdges().empty()) {
+            uint16_t nextNodeId = currNode->getEdges()[0].getDstId();
+            if (nodeIdToIndex.find(nextNodeId) != nodeIdToIndex.end()) {
+                return nodeIdToIndex[nextNodeId];
             }
         }
-    } else {
-        // No cycle found - repeat target state
-        uint16_t targetNodeId = indexToNodeId[targetStateIdx];
-        for (int i = 0; i < 5; i++) {
-            result.push_back(targetNodeId);
+        return -1;
+    };
+
+    // Step 1: Find path from initial state (0) to first accepting state
+    auto [firstAcceptingIdx, parent1, dist1] = dijkstraToAccepting(nodeIdToIndex[0], false);
+    if (firstAcceptingIdx == -1) {
+        std::cerr << "No path to accepting state found!" << std::endl;
+        return std::make_tuple(std::vector<uint16_t>(), UINT32_MAX);
+    }
+
+    // Step 2: Find path from first accepting state to second accepting state (first loop)
+    // Skip the first accepting state itself, find a different accepting state
+    auto [secondAcceptingIdx, parent2, dist2] = dijkstraToAccepting(firstAcceptingIdx, true);
+    if (secondAcceptingIdx == -1) {
+        std::cerr << "No path to second accepting state found!" << std::endl;
+        return std::make_tuple(std::vector<uint16_t>(), UINT32_MAX);
+    }
+
+    // Step 3: Find path from second accepting state to third accepting state (second loop)
+    // Skip the second accepting state itself, find a different accepting state
+    auto [thirdAcceptingIdx, parent3, dist3] = dijkstraToAccepting(secondAcceptingIdx, true);
+    if (thirdAcceptingIdx == -1) {
+        std::cerr << "No path to third accepting state found!" << std::endl;
+        return std::make_tuple(std::vector<uint16_t>(), UINT32_MAX);
+    }
+
+    // Step 4: Get one additional node from third accepting state
+    int additionalNodeIdx = getNextNode(thirdAcceptingIdx);
+
+    // Reconstruct full path with weights: initial → first accepting → second accepting → third accepting → +1 node
+    std::vector<uint16_t> result;
+    std::vector<uint32_t> edgeWeights;  // weights between consecutive nodes
+
+    // Path to first accepting state
+    std::vector<int> segment1Path;
+    int current = firstAcceptingIdx;
+    while (current != -1) {
+        segment1Path.insert(segment1Path.begin(), current);
+        current = parent1[current];
+    }
+    for (int idx : segment1Path) {
+        result.push_back(indexToNodeId[idx]);
+    }
+
+    // Path from first to second accepting state (skip first node to avoid duplication)
+    std::vector<int> segment2Path;
+    current = secondAcceptingIdx;
+    while (current != -1 && current != firstAcceptingIdx) {
+        segment2Path.insert(segment2Path.begin(), current);
+        current = parent2[current];
+    }
+    for (int idx : segment2Path) {
+        result.push_back(indexToNodeId[idx]);
+    }
+
+    // Path from second to third accepting state (skip first node to avoid duplication)
+    std::vector<int> segment3Path;
+    current = thirdAcceptingIdx;
+    while (current != -1 && current != secondAcceptingIdx) {
+        segment3Path.insert(segment3Path.begin(), current);
+        current = parent3[current];
+    }
+    for (int idx : segment3Path) {
+        result.push_back(indexToNodeId[idx]);
+    }
+
+    // Add one additional node if found
+    if (additionalNodeIdx != -1) {
+        result.push_back(indexToNodeId[additionalNodeIdx]);
+    }
+
+    // Calculate edge weights
+    std::vector<uint32_t> weights;
+    for (size_t i = 0; i < result.size() - 1; ++i) {
+        uint16_t srcNodeId = result[i];
+        uint16_t dstNodeId = result[i + 1];
+        
+        Node* srcNode = nodeMap[srcNodeId];
+        uint32_t weight = 0;
+        
+        if (srcNode) {
+            for (const auto& edge : srcNode->getEdges()) {
+                if (edge.getDstId() == dstNodeId) {
+                    weight = edge.getWeight();
+                    break;
+                }
+            }
+        }
+        weights.push_back(weight);
+    }
+
+    // Output path with weights
+    std::cout << "\nOptimal Accepting Path (with edge weights):" << std::endl;
+    std::cout << "  Accepting states found: " << indexToNodeId[firstAcceptingIdx] 
+              << ", " << indexToNodeId[secondAcceptingIdx] 
+              << ", " << indexToNodeId[thirdAcceptingIdx] << std::endl;
+    std::cout << "  Path: ";
+    for (size_t i = 0; i < result.size(); ++i) {
+        if (i > 0) std::cout << " -(" << weights[i-1] << ")-> ";
+        std::cout << result[i];
+        
+        // Also show product states (robot positions)
+        Node* node = nodeMap[result[i]];
+        if (node) {
+            auto productStates = node->getProductStates().second;
+            std::cout << "[";
+            for (size_t j = 0; j < productStates.size(); ++j) {
+                if (j > 0) std::cout << ",";
+                std::cout << productStates[j];
+            }
+            std::cout << "]";
         }
     }
+    std::cout << std::endl;
     
-    return result;
+    uint32_t totalWeight = 0;
+    for (uint32_t w : weights) totalWeight += w;
+    std::cout << "  Total weight: " << totalWeight << std::endl;
+
+    return std::make_tuple(result, totalWeight);
 }
+
 
 // Parse product automaton from DOT representation with Edge weights
 void ProductAutomaton::parseProductFromDot(const std::string& dotContent, const Environment& env, const MultiRobotSystem& mrs) {
@@ -362,6 +402,7 @@ void ProductAutomaton::parseProductFromDot(const std::string& dotContent, const 
     }
     
     while (std::getline(stream, line)) {
+        
         // Trim line
         line.erase(0, line.find_first_not_of(" \t"));
         line.erase(line.find_last_not_of(" \t") + 1);
@@ -416,14 +457,20 @@ void ProductAutomaton::parseProductFromDot(const std::string& dotContent, const 
                 unsigned dst = dstLabelPair.first;
                 
                 if (dst <= UINT16_MAX) {
-                    Edge e(static_cast<uint16_t>(dst), getEdgeWeight(srcNode, getNode(static_cast<uint16_t>(dst)), env, mrs));
-                    srcNode->addEdge(e);
-                    numEdges++;
+                    Node* dstNode = getNode(static_cast<uint16_t>(dst));
+                    if (dstNode != nullptr) {
+                        uint32_t wght = getEdgeWeight(srcNode, dstNode, env, mrs);
+                        // Only add edge if weight is positive
+                        if (wght > 0) {
+                            Edge e(static_cast<uint16_t>(dst), wght);
+                            srcNode->addEdge(e);
+                            numEdges++;
+                        }
+                    }
                 }
             }
         }
     }
-    
     // Mark accepting states (peripheries=2 in DOT)
     for (unsigned nodeId : acceptingNodeIds) {
         if (nodeId <= UINT16_MAX) {
@@ -679,19 +726,45 @@ void ProductAutomaton::initCartesianStateMapping(std::vector<std::vector<uint16_
     }
 }
 uint32_t ProductAutomaton::getEdgeWeight(Node* srcNode, Node* dstNode, const Environment& env, const MultiRobotSystem& mrs) const {
+    // Defensive checks
+    if (srcNode == nullptr || dstNode == nullptr) {
+        std::cerr << "ERROR: getEdgeWeight called with null node!" << std::endl;
+        return 0;
+    }
+    
     uint16_t maxtime = 0;
-    std::vector<uint16_t> srcProductStates = srcNode->getProductStates().second;  //get the src nodes product states
-    std::vector<uint16_t> dstProductStates = dstNode->getProductStates().second;  //get the dst nodes product states
-    for (size_t i = 0; i < srcProductStates.size(); ++i) {
-        uint16_t srcState = srcProductStates[i];
-        uint16_t dstState = (i < dstProductStates.size()) ? dstProductStates[i] : srcState;
-        if (srcState != dstState) {
-            uint16_t weight = mrs.getRobot(i)->getTravelTime(env.TSStateIdToGridCenter(srcState), env.TSStateIdToGridCenter(dstState));  // Example logic to get the weight from the environment and multi-robot system
-            if (weight > maxtime) {
-                maxtime = weight;
+    
+    try {
+        std::vector<uint16_t> srcProductStates = srcNode->getProductStates().second;  //get the src nodes product states
+        std::vector<uint16_t> dstProductStates = dstNode->getProductStates().second;  //get the dst nodes product states
+        
+        // If product states are empty, return 0 (no weight can be computed)
+        if (srcProductStates.empty() || dstProductStates.empty()) {
+            std::cout << "      [DEBUG] Empty product states - src=" << srcProductStates.size() << ", dst=" << dstProductStates.size() << std::endl;
+            return 0;
+        }
+        
+        for (size_t i = 0; i < srcProductStates.size(); ++i) {
+            uint16_t srcState = srcProductStates[i];
+            uint16_t dstState = (i < dstProductStates.size()) ? dstProductStates[i] : srcState;
+            if (srcState != dstState) {
+                // Bounds check on robot index
+                if (i >= mrs.getNumRobots()) {
+                    std::cerr << "ERROR: Robot index " << i << " exceeds " << mrs.getNumRobots() << " robots!" << std::endl;
+                    continue;
+                }
+                
+                uint16_t weight = mrs.getRobot(i)->getTravelTime(env.TSStateIdToGridCenter(srcState), env.TSStateIdToGridCenter(dstState));  
+                if (weight > maxtime) {
+                    maxtime = weight;
+                }
             }
         }
+    } catch (const std::exception& e) {
+        std::cerr << "ERROR in getEdgeWeight: " << e.what() << std::endl;
+        return 0;
     }
+    
     return maxtime;
 }
 

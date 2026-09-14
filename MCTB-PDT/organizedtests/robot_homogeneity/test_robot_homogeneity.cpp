@@ -1,12 +1,11 @@
 #include <iostream>
 #include <vector>
+#include <tuple>
 #include <chrono>
 #include <fstream>
 #include <iomanip>
 #include <cstring>
 #include <sys/resource.h>
-#include <map>
-#include <cmath>
 #include "../include/TaskAllocationAlgorithms.h"
 #include "../include/Environment/gridvis.h"
 #include "../include/Tree/PlanningDecisionTree.h"
@@ -19,255 +18,367 @@
 #include "../../Automatons/ProductAutomaton.h"
 
 using namespace std;
-
-// Test: Robot Fleet Homogeneity (0.2-3.0)
-// Fixed: 6 robots, 6 regions, 1 Buchi automaton
-
-struct HomogeneityTest {
-    int testNum;
-    double homogeneity;
-    int independentCapabilities;
-    string fleetType;
-};
-
+//=================================================================================
+// Test: Number of Average Capabilities per robot: 8 total average capabilities configurations ranging from (1-4)
+//=================================================================================
+// Buchi: 6 automata (8-64) states
+//=================================================================================
+//Environments: 6-robot, 10-robot, 16-robot all with 6 TS regions
+//=================================================================================
+    
 // Forward declarations
-void createTestEnvironmentWithHomogeneity(int indepCaps, TS*& ts, GridWorld*& grid, Environment*& env, MultiRobotSystem*& mrs);
-BuchiAutomaton* createTestBuchiAutomaton();
+void createTestEnvironment(TS*& ts, GridWorld*& grid, Environment*& env, MultiRobotSystem*& mrs, int robotCount, double homogeneity);
+BuchiAutomaton* createTestInfiniteBuchiAutomaton1();  // Originally automaton 2
+BuchiAutomaton* createTestInfiniteBuchiAutomaton2();  // Originally automaton 4
+BuchiAutomaton* createTestInfiniteBuchiAutomaton3();  // Originally automaton 6
+BuchiAutomaton* createTestInfiniteBuchiAutomaton4();  // Originally automaton 8
+BuchiAutomaton* createTestInfiniteBuchiAutomaton5();  // Originally automaton 10
+BuchiAutomaton* createTestInfiniteBuchiAutomaton6();  // Originally automaton 12
+
 
 // Get memory usage in MB
 double getMemoryUsageMB() {
     struct rusage r_usage;
     getrusage(RUSAGE_SELF, &r_usage);
-    return (double)r_usage.ru_maxrss / 1024.0;
+    return (double)r_usage.ru_maxrss / 1024.0;  // Convert from KB to MB
 }
 
 int main() {
     cout << string(80, '=') << endl;
-    cout << "   ROBOT FLEET HOMOGENEITY TEST SUITE" << endl;
-    cout << "   Variable: Fleet homogeneity (0.2-3.0)" << endl;
-    cout << "   Fixed: 6 robots, 6 regions, 1 Buchi automaton" << endl;
+    cout << "   ROBOT HOMOGENEITY TEST SUITE" << endl;
+    cout << "   6 Büchi Automata (every other from 2-12)" << endl;
+    cout << "   8 Robot Homogeneity Values: 0.2, 0.6, 1.0, 1.4, 1.8, 2.2, 2.6, 3.0" << endl;
+    cout << "   Homogeneity = Independent Capabilities / Num Robots (no double-counting)" << endl;
+    cout << "   Total Tests: 144 (6 automata × 8 homogeneity values × 3 robot counts)" << endl;
     cout << string(80, '=') << "\n" << endl;
 
-    TestRunManager manager(TestRunManager::TestCategory::ROBOT_HOMOGENEITY, ".");
+    // Initialize TestRunManager for AUTOMATON_STATES category
+    TestRunManager manager(TestRunManager::TestCategory::AUTOMATON_STATES, ".");
     manager.initialize();
     cout << "✓ TestRunManager initialized\n" << endl;
 
-    vector<HomogeneityTest> tests = {
-        {1, 0.2, 1, "Highly Specialized"},
-        {2, 0.4, 2, "Very Specialized"},
-        {3, 0.6, 3, "Specialized"},
-        {4, 0.8, 4, "Mixed"},
-        {5, 1.0, 6, "Balanced"},
-        {6, 1.3, 8, "Homogeneous"},
-        {7, 1.5, 9, "Homogeneous"},
-        {8, 1.8, 11, "Very Homogeneous"},
-        {9, 2.3, 14, "Very Homogeneous"},
-        {10, 3.0, 18, "Identical Fleet"}
+    // Create array of automaton factory functions (6 automatons: every other from 2-12)
+    vector<BuchiAutomaton*(*)()> automatonFactories = {
+        createTestInfiniteBuchiAutomaton1,
+        createTestInfiniteBuchiAutomaton2,
+        createTestInfiniteBuchiAutomaton3,
+        createTestInfiniteBuchiAutomaton4,
+        createTestInfiniteBuchiAutomaton5,
+        createTestInfiniteBuchiAutomaton6
     };
     
-    cout << "\n" << string(80, '=') << endl;
-    cout << "   RUNNING HOMOGENEITY CONFIGURATION TESTS" << endl;
-    cout << string(80, '=') << "\n" << endl;
+    vector<double> homogeneityValues = {0.2, 0.6, 1, 1.4, 1.8, 2.2, 2.6, 3};
+    vector<int> robotCounts = {6, 10, 16};
+    int testNum = 1;
     
-    for (const auto& test : tests) {
-        cout << "\n  Test " << test.testNum << " (" << fixed << setprecision(1) << test.homogeneity 
-             << " - " << test.fleetType << ")... ";
-        cout.flush();
+    // Run tests: automatonId outer, robotCount middle, homogeneity inner
+    // This ensures each (automatonId, robotCount) pair gets all 8 homogeneity values
+    for (int automatonId = 1; automatonId <= 6; ++automatonId) {
+        for (int robotCount : robotCounts) {
+        cout << "\n" << string(80, '=') << endl;
+        cout << "   AUTOMATON " << automatonId << " WITH " << robotCount << "-ROBOT ENVIRONMENT" << endl;
+        cout << string(80, '=') << "\n" << endl;
         
-        try {
+        cout << "\n" << string(80, '-') << endl;
+        cout << "   RUNNING TESTS (robot_homogeneity varying)" << endl;
+        cout << string(80, '-') << "\n" << endl;
+        
+        // For each of the 8 robot homogeneity values
+        for (double homogeneity : homogeneityValues) {
+            // Create test environment for this configuration
             TS* ts = nullptr;
             GridWorld* grid = nullptr;
             Environment* env = nullptr;
             MultiRobotSystem* mrs = nullptr;
+            createTestEnvironment(ts, grid, env, mrs, robotCount, homogeneity);
+            cout << "\n  Test " << testNum << " (Automaton " << automatonId << ", Robots " << robotCount << ", Homogeneity " << homogeneity << ")... ";
+            cout.flush();
             
-            createTestEnvironmentWithHomogeneity(test.independentCapabilities, ts, grid, env, mrs);
-            
-            BuchiAutomaton* buchi = createTestBuchiAutomaton();
-            
-            if (!buchi) {
-                cout << "ERROR: Failed to create automaton" << endl;
-                delete mrs;
-                delete env;
-                delete grid;
-                delete ts;
-                continue;
+            try {
+                // Create the Buchi automaton
+                BuchiAutomaton* buchi = automatonFactories[automatonId - 1]();
+                
+                if (!buchi) {
+                    cout << "ERROR: Failed to create automaton" << endl;
+                    testNum++;
+                    continue;
+                }
+                
+                // Create TaskAllocationAlgorithms
+                TaskAllocationAlgorithms* allocAlg = new TaskAllocationAlgorithms(buchi, env, mrs);
+                
+                // Measure memory 
+                double memBefore = getMemoryUsageMB();
+                //build the planning decision tree
+                allocAlg->intensiveInterTaskRelationshipTreeSearch(buchi, env, mrs);
+                double memAfter = getMemoryUsageMB();
+                double memUsed = memAfter - memBefore;
+                allocAlg->getMetrics().setTaskMemoryUsageMB(memUsed);
+                // bool shouldSkip = (robotCount > 10) && (buchi->getNumStates()*std::pow(ts->getNumStates(), robotCount) > UINT16_MAX/2);
+                // if (!shouldSkip) {
+                //     //buld the product automaton and store its metrics
+                //     double memBeforeProduct = getMemoryUsageMB();
+                //     double startTimeProduct = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+                //     ProductAutomaton product(*env, *mrs, *buchi);
+                //     std::tuple<std::vector<uint16_t>, uint32_t> optimalPath = product.OptimalAcceptingPath();
+                //     double memAfterProduct = getMemoryUsageMB();
+                //     double endTimeProduct = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+                //     double memUsedProduct = memAfterProduct - memBeforeProduct;
+                    
+                //     //add the full product automaton metrics to the algorithm metrics
+                //     allocAlg->getMetrics().setFullProductAutomatonMetrics(
+                //         product.getNumStates(),
+                //         product.getNumEdges(),
+                //         std::get<1>(optimalPath), // makespan for product
+                //         (endTimeProduct - startTimeProduct) / 1e6,  // convert from nanoseconds to milliseconds
+                //         memUsedProduct
+                //     );
+                //     // Compute derived metrics after setting full product automaton metrics
+                //     allocAlg->getMetrics().computeDerivedMetrics();
+                // }
+
+                allocAlg->getMetrics().printSummary();
+                
+                // Store run in TestRunManager
+                // robot_homogeneity is the independent variable (varies within each CSV)
+                map<string, string> parameters;
+                parameters["automaton_id"] = to_string(automatonId);
+                parameters["num_robots"] = to_string(robotCount);
+                parameters["robot_homogeneity"] = to_string(homogeneity);
+                
+                manager.storeRun(
+                    allocAlg->getMetrics(),
+                    parameters,
+                    to_string(homogeneity),  // independent variable: robot_homogeneity varies within each CSV
+                    1  // trial number
+                );
+                
+                delete allocAlg;
+                delete buchi;
+                
+            } catch (const exception& e) {
+                cout << "ERROR: " << e.what() << endl;
             }
             
-            TaskAllocationAlgorithms* allocAlg = new TaskAllocationAlgorithms(buchi, env, mrs);
-            allocAlg->intensiveInterTaskRelationshipTreeSearch(buchi, env, mrs);
+            testNum++;
             
-            cout << "✓ Complete\n";
-            allocAlg->getMetrics().printSummary();
-            
-            map<string, string> parameters;
-            parameters["homogeneity"] = to_string(test.homogeneity);
-            parameters["independent_capabilities"] = to_string(test.independentCapabilities);
-            parameters["fleet_type"] = test.fleetType;
-            
-            manager.storeRun(
-                allocAlg->getMetrics(),
-                parameters,
-                to_string(test.independentCapabilities),
-                1
-            );
-            
-            delete allocAlg;
-            delete buchi;
+            // Cleanup after each test
             delete mrs;
             delete env;
             delete grid;
             delete ts;
-            
-        } catch (const exception& e) {
-            cout << "ERROR: " << e.what() << endl;
         }
+        
+        cout << "\n" << string(80, '=') << endl;
+        cout << "   AUTOMATON " << automatonId << " CONFIGURATION COMPLETE" << endl;
+        cout << string(80, '=') << "\n" << endl;
     }
+}
+    cout << "\n" << string(80, '=') << "\n" << endl;
+    cout << "✓ All tests completed!" << endl;
+    cout << "   - 144 total tests executed (6 automata × 3 robot counts × 8 homogeneity values)" << endl;
+    cout << "   - Generating 18 CSV files (6 automata × 3 robot counts)" << endl;
     
-    cout << "\n" << string(80, '=') << endl;
-    cout << "   TESTING COMPLETE" << endl;
-    cout << string(80, '=') << "\n" << endl;
-
-    cout << "\n✓ All tests completed!" << endl;
-    cout << "   - " << tests.size() << " homogeneity configurations tested" << endl;
+    // Export results - ONCE after all data collected
+    cout << "\n✓ Exporting results by automaton_id and num_robots configuration..." << endl;
+    manager.exportByConfiguration("data", "robot_homogeneity");
     
-    cout << "\n✓ Exporting results from TestRunManager..." << endl;
-    manager.exportByConfiguration();
+    // Export final statistics
+    cout << "\n✓ Exporting final statistics..." << endl;
     manager.exportStatisticsToCSV("data/statistics.csv");
     manager.exportSummaryReport("data/summary_report.txt");
     manager.printTestProgress();
     
-    cout << "\n✓ Results stored in data/" << endl;
+    cout << "\n✓ CSV Results stored in data/ folder:" << endl;
+    cout << "   18 CSV files (6 automata × 3 robot counts):" << endl;
+    cout << "   Each CSV contains rows for robot_homogeneity: 0.2, 0.6, 1.0, 1.4, 1.8, 2.2, 2.6, 3.0" << endl;
+    cout << "\n   Automaton 1:" << endl;
+    cout << "   - automaton_states_automaton_id_1_num_robots_6.csv" << endl;
+    cout << "   - automaton_states_automaton_id_1_num_robots_10.csv" << endl;
+    cout << "   - automaton_states_automaton_id_1_num_robots_16.csv" << endl;
+    cout << "   Automaton 2:" << endl;
+    cout << "   - automaton_states_automaton_id_2_num_robots_6.csv" << endl;
+    cout << "   - automaton_states_automaton_id_2_num_robots_10.csv" << endl;
+    cout << "   - automaton_states_automaton_id_2_num_robots_16.csv" << endl;
+    cout << "   Automaton 3:" << endl;
+    cout << "   - automaton_states_automaton_id_3_num_robots_6.csv" << endl;
+    cout << "   - automaton_states_automaton_id_3_num_robots_10.csv" << endl;
+    cout << "   - automaton_states_automaton_id_3_num_robots_16.csv" << endl;
+    cout << "   Automaton 4:" << endl;
+    cout << "   - automaton_states_automaton_id_4_num_robots_6.csv" << endl;
+    cout << "   - automaton_states_automaton_id_4_num_robots_10.csv" << endl;
+    cout << "   - automaton_states_automaton_id_4_num_robots_16.csv" << endl;
+    cout << "   Automaton 5:" << endl;
+    cout << "   - automaton_states_automaton_id_5_num_robots_6.csv" << endl;
+    cout << "   - automaton_states_automaton_id_5_num_robots_10.csv" << endl;
+    cout << "   - automaton_states_automaton_id_5_num_robots_16.csv" << endl;
+    cout << "   Automaton 6:" << endl;
+    cout << "   - automaton_states_automaton_id_6_num_robots_6.csv" << endl;
+    cout << "   - automaton_states_automaton_id_6_num_robots_10.csv" << endl;
+    cout << "   - automaton_states_automaton_id_6_num_robots_16.csv" << endl;
+    cout << "\n✓ Statistics and summary stored in data/" << endl;
     cout << string(80, '=') << "\n" << endl;
     
     return 0;
 }
 
+
+// REMOVED: createTestInfiniteBuchiAutomaton1 (originally test 1)
+
 /**
- * Create a Buchi automaton for testing
+ * Test 2: Nested Next Operators with Sequencing → RENAMED TO 1
+ * Combines infinitely-often with chained next operators
+ * Complexity: 4 APs, 6 Automaton States
+ * G(F("p0" & X("p1" & X"p2"))) & G(F("p3"))
  */
-BuchiAutomaton* createTestBuchiAutomaton() {
-    string ltl_str = "G(F(\"p0\")) & G(F(\"p1\")) & G(F(\"p2\")) & (!\"p0\" U \"p1\")";
+BuchiAutomaton* createTestInfiniteBuchiAutomaton1() {
+    string ltl_str = "(G(F(\"p0\")) & G(F(\"p2\")))";
+    
+    vector<BatchAtomicProposition> batchAPs;
+    batchAPs.push_back(BatchAtomicProposition(0, 0, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(2, 2, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
+    
+    LTLFormula* ltlFormula = new LTLFormula(ltl_str, batchAPs);
+    BuchiAutomaton* buchi = new BuchiAutomaton(ltlFormula);
+    buchi->visualize("output/automaton_test_infinite_1.dot");
+    return buchi;
+}
+
+// This function was moved to createTestInfiniteBuchiAutomaton1
+// REMOVED: createTestInfiniteBuchiAutomaton2 placeholder (now createTestInfiniteBuchiAutomaton1)
+
+/**
+ * Test 3: Mixed Next and Until Operators → RENAMED TO 2
+ * Combines infinitely-often with until (weak until) patterns
+ * Complexity: 5 APs, 10 Automaton States
+ * G(F("p0")) & G(F("p1" & X("p2"))) & G(F(!"p3" U "p4") & G(F("p3")))
+ */
+BuchiAutomaton* createTestInfiniteBuchiAutomaton2() {
+    string ltl_str = "G(F(\"p0\" & X(\"p1\" & X\"p2\"))) & G(F(\"p3\"))";
     
     vector<BatchAtomicProposition> batchAPs;
     batchAPs.push_back(BatchAtomicProposition(0, 0, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
     batchAPs.push_back(BatchAtomicProposition(1, 1, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(2, 2, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(2, 2, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(3, 3, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
 
     LTLFormula* ltlFormula = new LTLFormula(ltl_str, batchAPs);
     BuchiAutomaton* buchi = new BuchiAutomaton(ltlFormula);
     return buchi;
 }
 
-/**
- * Create test environment with variable capability distribution for homogeneity testing
- * Fixed: 6 robots, 6 regions, 210x210 grid
- * Variable: Number of independent capabilities to achieve different homogeneity scores
- */
-void createTestEnvironmentWithHomogeneity(int indepCaps, TS*& ts, GridWorld*& grid, Environment*& env, MultiRobotSystem*& mrs) {
-    grid = new GridWorld(210, 210);
-    ts = new TS();
-    
-    Node* node0 = new Node(0, "R0");
-    Node* node1 = new Node(1, "R1");
-    Node* node2 = new Node(2, "R2");
-    Node* node3 = new Node(3, "R3");
-    Node* node4 = new Node(4, "R4");
-    Node* node5 = new Node(5, "R5");
+// REMOVED: createTestInfiniteBuchiAutomaton3 (originally test 3)
+// This was moved to createTestInfiniteBuchiAutomaton2
 
-    node0->addEdge(Edge(2));
-    node2->addEdge(Edge(0));
-    node1->addEdge(Edge(2));
-    node2->addEdge(Edge(1));
-    node3->addEdge(Edge(2));
-    node2->addEdge(Edge(3));
-    node4->addEdge(Edge(2));
-    node2->addEdge(Edge(4));
-    node5->addEdge(Edge(2));
-    node2->addEdge(Edge(5));
+/**
+ * Test 4: Until with Disjunctive Branching → RENAMED TO 3
+ * Introduces disjunction at top level with complex nested structure
+ * Complexity: 5 APs, 16 Automaton States
+ * G((F("p0" & X(!"p1" U "p2")))) & G(F("p1")) & (G(F("p3")) | G(F("p4" & X("p0"))))
+ */
+BuchiAutomaton* createTestInfiniteBuchiAutomaton3() {
+    string ltl_str = "(G(F(\"p0\")) & G(F(\"p1\" & X(\"p2\"))) & G(F(!\"p3\" U \"p4\") & G(F(\"p3\"))))";
     
-    ts->add_Node(node0);
-    ts->add_Node(node1);
-    ts->add_Node(node2);
-    ts->add_Node(node3);
-    ts->add_Node(node4);
-    ts->add_Node(node5);
-    ts->setInitial(0);
+    vector<BatchAtomicProposition> batchAPs;
+    batchAPs.push_back(BatchAtomicProposition(0, 0, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(1, 1, {true, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(2, 2, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(3, 3, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(4, 4, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
     
-    env = new Environment(ts, grid);
-    
-    env->mapTSStateToGrid(0, Point(180, 140), 50, 140);
-    env->mapTSStateToGrid(1, Point(180, 40), 50, 70);
-    env->mapTSStateToGrid(2, Point(100, 100), 60, 200);
-    env->mapTSStateToGrid(3, Point(50, 30), 50, 180);
-    env->mapTSStateToGrid(4, Point(50, 100), 50, 110);
-    env->mapTSStateToGrid(5, Point(50, 150), 50, 40);
-    
-    mrs = new MultiRobotSystem();
-    
-    // Capability pool to distribute
-    vector<RobotCapability> capPool = {
-        RobotCapability::SENSOR_GPS,
-        RobotCapability::MOVEMENT_GROUND,
-        RobotCapability::SENSOR_CAMERA,
-        RobotCapability::SENSOR_GPS,
-        RobotCapability::MOVEMENT_GROUND,
-        RobotCapability::SENSOR_CAMERA
-    };
-    
-    // Create 6 robots with varying capability distribution
-    for (int i = 1; i <= 6; i++) {
-        int x = 140 + (i - 1);
-        int y = 120;
-        
-        Robot* r = new Robot(i, "Rover_" + to_string(i), Point(x, y));
-        r->initializeCapabilities(13);
-        
-        // Distribute capabilities based on homogeneity
-        if (i <= indepCaps % 6) {
-            // First robots get more diverse capabilities
-            if (i <= indepCaps) {
-                r->enableCapability(capPool[i - 1]);
-            }
-        } else {
-            // Remaining robots get repeated/similar capabilities
-            r->enableCapability(capPool[(i - 1) % 3]);
-        }
-        
-        mrs->addRobot(r);
-    }
+    LTLFormula* ltlFormula = new LTLFormula(ltl_str, batchAPs);
+    BuchiAutomaton* buchi = new BuchiAutomaton(ltlFormula);
+    return buchi;
 }
 
-    r2->enableCapability(RobotCapability::MOVEMENT_GROUND); //A
-    mrs->addRobot(r2);
+// This function was moved to createTestInfiniteBuchiAutomaton3
+// REMOVED: createTestInfiniteBuchiAutomaton4 placeholder (now createTestInfiniteBuchiAutomaton3)
+
+/**
+ * Test 5: Multiple Sequential Until Conditions → RENAMED TO 4
+ * Deep nesting of until operators with complex boolean combinations
+ * Complexity: 10 APs, 20 Automaton States
+ * G((F(!"p0" U ("p1" & F("p2"))) & G(F("p0")) & G(F("p3")) & F(!"p3" U ("p4" & F("p5"))) & F("p3") & F("p6" & X("p7")) & G(F("p8")) & G(F(!"p8" U "p9"))))
+ */
+BuchiAutomaton* createTestInfiniteBuchiAutomaton4() {
+    string ltl_str = "G((F(\"p0\" & X(!\"p1\" U \"p2\")))) & G(F(\"p1\")) & (G(F(\"p3\")) | G(F(\"p4\" & X(\"p0\"))))";
     
-    Robot* r3 = new Robot(3, "Rover_3", Point(19, 14));
-    r3->initializeCapabilities(13);
-    r3->enableCapability(RobotCapability::SENSOR_CAMERA); // B
-    mrs->addRobot(r3);
-    Robot* r4 = new Robot(4, "Rover_4", Point(18, 13));
-    r4->initializeCapabilities(13);
-    r4->enableCapability(RobotCapability::SENSOR_GPS); // C
-    mrs->addRobot(r4);
+    vector<BatchAtomicProposition> batchAPs;
+    batchAPs.push_back(BatchAtomicProposition(0, 0, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(1, 1, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(2, 2, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(3, 3, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(4, 4, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
+
+    LTLFormula* ltlFormula = new LTLFormula(ltl_str, batchAPs);
+    BuchiAutomaton* buchi = new BuchiAutomaton(ltlFormula);
+    return buchi;
+}
+
+// REMOVED: createTestInfiniteBuchiAutomaton5 (originally test 5)
+// This was moved to createTestInfiniteBuchiAutomaton4
+
+/**
+ * Test 7: Extended Formula with Infinitely-Often and Next Operators → RENAMED TO 5
+ * Enhances Test 6 pattern with additional temporal constraints (p8, p9)
+ * Complexity: 10 APs, 27 Automaton States
+ * G((F("p0" & X(!"p1" U "p2")))) & G(F("p1")) & (G(F("p3")) & G(F("p5")) & G(F(("p8") & X("p9")))) | G(F("p4" & X("p0")) & G(F("p6" & X("p7")))))
+ */
+BuchiAutomaton* createTestInfiniteBuchiAutomaton5() {
+    string ltl_str = "(G((F(!\"p0\" U (\"p1\" & F(\"p2\"))) & G(F(\"p0\")) & G(F(\"p3\")) & F(!\"p3\" U (\"p4\" & F(\"p5\"))) & F(\"p3\") & F(\"p6\" & X(\"p7\")) & G(F(\"p8\")) & G(F(!\"p8\" U \"p9\"))))";
     
-    Robot* r5 = new Robot(5, "Rover_5", Point(18, 15));
-    r5->initializeCapabilities(13);
-    r5->enableCapability(RobotCapability::MOVEMENT_GROUND);
-    mrs->addRobot(r5);
+    vector<BatchAtomicProposition> batchAPs;
+    for (int i = 0; i < 10; i++) {
+        uint16_t tsState = i % 6;
+        bool hasGPS = (i % 2 == 0);
+        vector<bool> caps(13, false);
+        if (hasGPS) caps[5] = true;
+        if (i % 3 == 1) caps[0] = true;
+        caps[5] = true;  // All have GPS
+        
+        batchAPs.push_back(BatchAtomicProposition(i, tsState, caps, 0));
+    }
     
-    Robot* r6 = new Robot(6, "Rover_6", Point(17, 15));
-    r6->initializeCapabilities(13);
-    r6->enableCapability(RobotCapability::SENSOR_CAMERA);
-    mrs->addRobot(r6);
+    LTLFormula* ltlFormula = new LTLFormula(ltl_str, batchAPs);
+    BuchiAutomaton* buchi = new BuchiAutomaton(ltlFormula);
+    return buchi;
+}
+
+// This function was moved to createTestInfiniteBuchiAutomaton5
+// REMOVED: createTestInfiniteBuchiAutomaton6 placeholder (now createTestInfiniteBuchiAutomaton5)
+
+/**
+ * Test 8: Standardized High-Complexity Formula (Disjunctive Pattern) → RENAMED TO 6
+ * 18 APs, 38 Automaton States, until-based liveness properties, variant of Test 7 with OR instead of AND
+ * Complexity: 18 APs, standardized G(F(!pX U pY)) pattern throughout, disjunctive top-level
+ */
+BuchiAutomaton* createTestInfiniteBuchiAutomaton6() {
+    string ltl_str = "G((F(\"p0\" & X(!\"p1\" U \"p2\")))) & G(F(\"p1\")) & (G(F(\"p3\")) & G(F(\"p5\")) & G(F((\"p8\") & X(\"p9\")))) | G(F(\"p4\" & X(\"p0\")) & G(F(\"p6\" & X(\"p7\")))))";
     
-    cout << "✓ MultiRobotSystem created with 6 robots" << endl;
+    vector<BatchAtomicProposition> batchAPs;
+    batchAPs.push_back(BatchAtomicProposition(0, 0, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(1, 1, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(2, 2, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(3, 3, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(4, 4, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(5, 5, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(6, 2, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));  // p6
+    batchAPs.push_back(BatchAtomicProposition(7, 4, {true, false, false, true, false, true, false, false, false, false, false, false, false}, 0));  // p7
+    batchAPs.push_back(BatchAtomicProposition(8, 3, {true, false, false, true, false, true, false, false, false, false, false, false, false}, 0));  // p8
+    batchAPs.push_back(BatchAtomicProposition(9, 4, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));  // p9
+
+    LTLFormula* ltlFormula = new LTLFormula(ltl_str, batchAPs);
+    BuchiAutomaton* buchi = new BuchiAutomaton(ltlFormula);
+    return buchi;
 }
 
 // ============================================================================
-//Create test environment with TS and GridWorld with 3 robots and 6 regions
-void createTestEnvironment3(TS*& ts, GridWorld*& grid, Environment*& env, MultiRobotSystem*& mrs) {
+// Create test environment with TS and GridWorld - Robot Homogeneity variant
+// Homogeneity = Independent capabilities / num_robots (no double-counting)
+void createTestEnvironment(TS*& ts, GridWorld*& grid, Environment*& env, MultiRobotSystem*& mrs, int robotCount, double homogeneity) {
 // Allocate GridWorld
-    grid = new GridWorld(21, 21);
-    cout << "✓ GridWorld created (21x21)" << endl;
+    grid = new GridWorld(210, 210);
+    cout << "✓ GridWorld created (210x210)" << endl;
     
     // Allocate Transition System
     ts = new TS();
@@ -310,33 +421,69 @@ void createTestEnvironment3(TS*& ts, GridWorld*& grid, Environment*& env, MultiR
     cout << "✓ Environment created" << endl;
     
     // Map states to grid regions
-    env->mapTSStateToGrid(0, Point(18, 14), 5, 14);    // State 0 centered at (17,15), 4x6 region
-    env->mapTSStateToGrid(1, Point(18, 4), 5, 7);   // State 1 centered at (17,4)
-    env->mapTSStateToGrid(2, Point(10, 10), 6, 20);   // State 2 centered at (10,11)
-    env->mapTSStateToGrid(3, Point(5, 3), 5, 18);   // State 3 centered at (5,5)
-    env->mapTSStateToGrid(4, Point(5, 10), 5, 11);   // State 4 centered at (5,10)
-    env->mapTSStateToGrid(5, Point(5, 15), 5, 4);   // State 5 centered at (5,15)
+    env->mapTSStateToGrid(0, Point(180, 140), 60, 140);    // State 0 centered at (180,140)
+    env->mapTSStateToGrid(1, Point(180, 35), 60, 70);   // State 1 centered at (180,40)
+    env->mapTSStateToGrid(2, Point(120, 105), 60, 210);   // State 2 centered at (100,100)
+    env->mapTSStateToGrid(3, Point(45, 35), 90, 70);   // State 3 centered at (50,30)
+    env->mapTSStateToGrid(4, Point(45, 105), 90, 70);   // State 4 centered at (50,100)
+    env->mapTSStateToGrid(5, Point(45, 175), 90, 70);   // State 5 centered at (50,150)
     cout << "✓ Mapped 6 states to grid regions" << endl;
     
-    // Create MultiRobotSystem
+    // Create MultiRobotSystem with robots distributed for robot homogeneity
     mrs = new MultiRobotSystem();
     
-    // Position all robots in room 0 (centered at Point(18, 14))
-    Robot* r1 = new Robot(1, "Rover_1", Point(18, 14));
-    r1->initializeCapabilities(13);
-    r1->enableCapability(RobotCapability::SENSOR_GPS); //C
-    mrs->addRobot(r1);
+    // Calculate total independent capabilities needed
+    // homogeneity = total_independent_caps / robotCount
+    int totalCapabilities = static_cast<int>(round(homogeneity * robotCount));
     
-    Robot* r2 = new Robot(2, "Rover_2", Point(17, 14));
-    r2->initializeCapabilities(13);
-    r2->enableCapability(RobotCapability::MOVEMENT_GROUND); //A
-    mrs->addRobot(r2);
+    // Cap at maximum available capability types (13)
+    totalCapabilities = std::min(totalCapabilities, 13);
     
-    Robot* r3 = new Robot(3, "Rover_3", Point(19, 14));
-    r3->initializeCapabilities(13);
-    r3->enableCapability(RobotCapability::SENSOR_CAMERA); // B
-    mrs->addRobot(r3);
+    // Available capability types in order
+    vector<RobotCapability> capabilityPool = {
+        RobotCapability::SENSOR_GPS,
+        RobotCapability::MOVEMENT_GROUND,
+        RobotCapability::SENSOR_CAMERA,
+        RobotCapability::MANIPULATION_GRIPPER,
+        RobotCapability::MANIPULATION_TOOL,
+        RobotCapability::CAPABILITY_PAYLOAD,
+        RobotCapability::SENSOR_GPS,          // Repeat for variety
+        RobotCapability::MOVEMENT_GROUND,
+        RobotCapability::SENSOR_CAMERA,
+        RobotCapability::MANIPULATION_GRIPPER,
+        RobotCapability::MANIPULATION_TOOL,
+        RobotCapability::CAPABILITY_PAYLOAD,
+        RobotCapability::SENSOR_GPS
+    };
     
+    // Distribute totalCapabilities across robots round-robin (duplicates allowed)
+    int capIdx = 0;
+    for (int i = 1; i <= robotCount; i++) {
+        int col = (i - 1) % 3;  // 0-2 horizontal
+        int row = (i - 1) / 3;  // 0-4+ vertical
+        int x = 160 + col;
+        int y = 80 + row;
+        
+        Robot* r = new Robot(i, "Rover_" + to_string(i), Point(x, y));
+        r->initializeCapabilities(13);
+        
+        // Calculate how many capabilities this robot gets
+        // Distribute evenly across robots
+        int capsPerRobot = totalCapabilities / robotCount;
+        int remainder = totalCapabilities % robotCount;
+        int capCount = capsPerRobot + (i <= remainder ? 1 : 0);
+        
+        // Assign capabilities round-robin (duplicates across robots allowed)
+        for (int j = 0; j < capCount; j++) {
+            if (totalCapabilities > 0) {
+                r->enableCapability(capabilityPool[capIdx % capabilityPool.size()]);
+                capIdx++;
+            }
+        }
+        
+        mrs->addRobot(r);
+    }
     
-    cout << "✓ MultiRobotSystem created with 3 robots" << endl;
+    cout << "✓ MultiRobotSystem created with " << robotCount << " robots (homogeneity=" << homogeneity 
+         << ", total_independent_caps=" << totalCapabilities << ")" << endl;
 }

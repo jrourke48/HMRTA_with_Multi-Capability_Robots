@@ -121,6 +121,8 @@ PlanningDecisionTree* TaskAllocationAlgorithms::intensiveInterTaskRelationshipTr
     // Automaton characteristics
     indVars.num_automaton_states = nbaPtr->getNumStates();
     indVars.num_automaton_edges = nbaPtr->getNumEdges();
+    indVars.total_required_capabilities = nbaPtr->getLTLFormula()->getTotalRequiredCapabilities();
+    indVars.independent_required_capabilities = nbaPtr->getLTLFormula()->getIndependentRequiredCapabilities();
     if (!nbaPtr->getLTLFormula()) {
         std::cerr << "[ERROR] LTL formula is null" << std::endl;
         return nullptr;
@@ -130,38 +132,11 @@ PlanningDecisionTree* TaskAllocationAlgorithms::intensiveInterTaskRelationshipTr
     // Robot fleet characteristics
     indVars.num_robots = multiRobotSystemPtr->getNumRobots();
     indVars.num_ts_regions = envPtr->getNumStates();
+    // Total capabilities across all robots
+    indVars.total_robot_capabilities = multiRobotSystemPtr->getTotalRobotCapabilities();
+    indVars.independent_robot_capabilities = multiRobotSystemPtr->getIndependentCapabilities();
     
-    // Calculate total capabilities across all robots
-    int totalCaps = 0;
-    const auto& robots = multiRobotSystemPtr->getRobots();
-    for (const auto* robot : robots) {
-        if (robot) {
-            const auto& caps = robot->getCapabilities();
-            for (bool hasCapability : caps) {
-                if (hasCapability) totalCaps++;
-            }
-        }
-    }
-    indVars.total_robot_capabilities = totalCaps;
-    indVars.avg_capabilities_per_robot = indVars.num_robots > 0 ? 
-        static_cast<double>(totalCaps) / indVars.num_robots : 0.0;
-    
-    // Capability homogeneity: count how many robots have the SAME capabilities
-    // If all robots are identical, homogeneity = 1.0
-    // If all robots are different, homogeneity = 1/num_robots
-    std::map<std::vector<bool>, int> capabilityGroups;
-    for (const auto* robot : robots) {
-        if (robot) {
-            capabilityGroups[robot->getCapabilities()]++;
-        }
-    }
-    int identicalRobots = 0;
-    for (const auto& [caps, count] : capabilityGroups) {
-        identicalRobots = std::max(identicalRobots, count);
-    }
-    indVars.capability_homogeneity = indVars.num_robots > 0 ? 
-        static_cast<double>(identicalRobots) / indVars.num_robots : 0.0;
-    
+   
     //Set inter-task constraints from LTL formula
     indVars.num_inter_task_constraints = 0;
     

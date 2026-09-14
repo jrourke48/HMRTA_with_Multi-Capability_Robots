@@ -1,6 +1,11 @@
 # Test Run Summary Report
 
 ## automaton_states
-**Status**: 0 / 44 runs (0.0%)
+**Status**: 64 / 64 runs (100.0%)
 
+| Metric | Value |
+|--------|-------|
+| Average Computation Time | 85.4 ms |
+| Last Run Timestamp | 2026-09-13 21:50:10 |
+| Total Runs | 64 |
 

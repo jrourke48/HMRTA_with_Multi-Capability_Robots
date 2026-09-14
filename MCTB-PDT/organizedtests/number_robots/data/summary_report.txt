@@ -1,0 +1,11 @@
+# Test Run Summary Report
+
+## num_robots
+**Status**: 64 / 64 runs (100.0%)
+
+| Metric | Value |
+|--------|-------|
+| Average Computation Time | 10.2 ms |
+| Last Run Timestamp | 2026-09-13 21:59:14 |
+| Total Runs | 64 |
+

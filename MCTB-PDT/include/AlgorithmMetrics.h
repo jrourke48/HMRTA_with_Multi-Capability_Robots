@@ -21,11 +21,14 @@ public:
         // Automaton characteristics
         int num_automaton_states = 0;
         int num_automaton_edges = 0;
+        int total_required_capabilities = 0;
+        int independent_required_capabilities = 0;
         int num_atomic_propositions = 0;
         
         // Robot fleet characteristics
         int num_robots = 0;
         int total_robot_capabilities = 0;
+        int independent_robot_capabilities = 0;
         int num_ts_regions = 0;
         
         // Derived values
@@ -62,7 +65,7 @@ public:
         double tree_product_ratio = 0.0;                 // tree_nodes / full_product_nodes
         double memory_reduction_ratio = 0.0;             // tree_memory / product_memory
         double optimality_gap_percent = 0.0;             // (J_tree - J_full) / J_full * 100
-        double runtime_speedup_percent = 0.0;            // (time_prod - time_tree) / time_prod * 100
+        double runtime_speedup = 0.0;                    // (time_prod - time_tree) / time_prod * 100
         double percent_nodes_in_tree = 0.0;              // (generated / traversed) * 100
         long long state_space_reduction = 0;             // product_nodes - tree_nodes
     };
@@ -155,6 +158,9 @@ private:
     double computeMemoryReductionRatio() const;
     double computeRobotUtilizationRatio() const;
     double computeLoadBalanceVariance() const;
+    double computeOptimalityGap() const;
+    double computeRuntimeSpeedup() const;
+    
 };
 
 #endif // ALGORITHM_METRICS_H
