@@ -164,7 +164,7 @@ double AlgorithmMetrics::computeMemoryReductionRatio() const {
 }
 double AlgorithmMetrics::computeOptimalityGap() const {
     if (solution_quality_.tree_makespan_seconds == 0) return 0.0;
-    return static_cast<double>(solution_quality_.tree_makespan_seconds-solution_quality_.product_makespan_seconds) / 
+    return 100.0 * static_cast<double>(solution_quality_.tree_makespan_seconds-solution_quality_.product_makespan_seconds) / 
            solution_quality_.tree_makespan_seconds;
 }
 double AlgorithmMetrics::computeRuntimeSpeedup() const {

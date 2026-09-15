@@ -32,7 +32,8 @@ for csv_file in sorted(csv_files):
     automaton_data[automaton_id] = {
         'ts_regions': [],
         'computation_times': [],
-        'makespans': []
+        'makespans': [],
+        'product_makespans': []
     }
     
     # Read CSV file
@@ -47,10 +48,12 @@ for csv_file in sorted(csv_files):
         ts_regions = int(row['num_ts_regions'])
         computation_time = float(row['total_computation_time_ms'])
         makespan = float(row['tree_makespan_seconds']) if 'tree_makespan_seconds' in row and row['tree_makespan_seconds'].strip() else 0
+        product_makespan = float(row['product_makespan_seconds']) if 'product_makespan_seconds' in row and row['product_makespan_seconds'].strip() else 0
         
         automaton_data[automaton_id]['ts_regions'].append(ts_regions)
         automaton_data[automaton_id]['computation_times'].append(computation_time)
         automaton_data[automaton_id]['makespans'].append(makespan)
+        automaton_data[automaton_id]['product_makespans'].append(product_makespan)
 
 # Define colors and markers for each automaton
 colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b',
@@ -96,7 +99,14 @@ for automaton_id in sorted(automaton_data.keys()):
     ax2.plot(data['ts_regions'], data['makespans'], 
              marker=markers[automaton_id-1], markersize=8, 
              linewidth=2.5, color=colors[automaton_id-1], 
-             label=f'Automaton {automaton_id}')
+             label=f'Automaton {automaton_id} (Task Allocation)')
+    
+    # Add product makespan overlay if non-zero values exist
+    if any(pm > 0 for pm in data['product_makespans']):
+        ax2.plot(data['ts_regions'], data['product_makespans'], 
+                marker=markers[automaton_id-1], markersize=6, 
+                linewidth=2.5, color=colors[automaton_id-1], linestyle='--',
+                label=f'Automaton {automaton_id} (Product)')
     
     # Add value labels on points
     for r, m in zip(data['ts_regions'], data['makespans']):

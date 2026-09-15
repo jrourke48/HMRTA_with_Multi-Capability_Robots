@@ -114,28 +114,28 @@ int main() {
                 double memAfter = getMemoryUsageMB();
                 double memUsed = memAfter - memBefore;
                 allocAlg->getMetrics().setTaskMemoryUsageMB(memUsed);
-                // bool shouldSkip = (robotCount > 10) && (buchi->getNumStates()*std::pow(ts->getNumStates(), robotCount) > UINT16_MAX/2);
-                // if (!shouldSkip) {
-                //     //buld the product automaton and store its metrics
-                //     double memBeforeProduct = getMemoryUsageMB();
-                //     double startTimeProduct = std::chrono::high_resolution_clock::now().time_since_epoch().count();
-                //     ProductAutomaton product(*env, *mrs, *buchi);
-                //     std::tuple<std::vector<uint16_t>, uint32_t> optimalPath = product.OptimalAcceptingPath();
-                //     double memAfterProduct = getMemoryUsageMB();
-                //     double endTimeProduct = std::chrono::high_resolution_clock::now().time_since_epoch().count();
-                //     double memUsedProduct = memAfterProduct - memBeforeProduct;
+                bool shouldSkip = (robotCount > 5) && (buchi->getNumStates()*std::pow(ts->getNumStates(), robotCount) > UINT16_MAX/2);
+                if (!shouldSkip) {
+                    //buld the product automaton and store its metrics
+                    double memBeforeProduct = getMemoryUsageMB();
+                    double startTimeProduct = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+                    ProductAutomaton product(*env, *mrs, *buchi);
+                    std::tuple<std::vector<uint16_t>, uint32_t> optimalPath = product.OptimalAcceptingPath();
+                    double memAfterProduct = getMemoryUsageMB();
+                    double endTimeProduct = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+                    double memUsedProduct = memAfterProduct - memBeforeProduct;
                     
-                //     //add the full product automaton metrics to the algorithm metrics
-                //     allocAlg->getMetrics().setFullProductAutomatonMetrics(
-                //         product.getNumStates(),
-                //         product.getNumEdges(),
-                //         std::get<1>(optimalPath), // makespan for product
-                //         (endTimeProduct - startTimeProduct) / 1e6,  // convert from nanoseconds to milliseconds
-                //         memUsedProduct
-                //     );
-                //     // Compute derived metrics after setting full product automaton metrics
-                //     allocAlg->getMetrics().computeDerivedMetrics();
-                // }
+                    //add the full product automaton metrics to the algorithm metrics
+                    allocAlg->getMetrics().setFullProductAutomatonMetrics(
+                        product.getNumStates(),
+                        product.getNumEdges(),
+                        std::get<1>(optimalPath), // makespan for product
+                        (endTimeProduct - startTimeProduct) / 1e6,  // convert from nanoseconds to milliseconds
+                        memUsedProduct
+                    );
+                    // Compute derived metrics after setting full product automaton metrics
+                    allocAlg->getMetrics().computeDerivedMetrics();
+                }
 
                 allocAlg->getMetrics().printSummary();
                 

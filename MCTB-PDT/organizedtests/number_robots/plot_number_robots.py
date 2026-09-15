@@ -32,7 +32,8 @@ for csv_file in sorted(csv_files):
     automaton_data[automaton_id] = {
         'robot_counts': [],
         'computation_times': [],
-        'makespans': []
+        'makespans': [],
+        'product_makespans': []
     }
     
     # Read CSV file
@@ -47,10 +48,12 @@ for csv_file in sorted(csv_files):
         robot_count = int(row['num_robots'])
         computation_time = float(row['total_computation_time_ms'])
         makespan = float(row['tree_makespan_seconds']) if 'tree_makespan_seconds' in row and row['tree_makespan_seconds'].strip() else 0
+        product_makespan = float(row['product_makespan_seconds']) if 'product_makespan_seconds' in row and row['product_makespan_seconds'].strip() else 0
         
         automaton_data[automaton_id]['robot_counts'].append(robot_count)
         automaton_data[automaton_id]['computation_times'].append(computation_time)
         automaton_data[automaton_id]['makespans'].append(makespan)
+        automaton_data[automaton_id]['product_makespans'].append(product_makespan)
 
 # Define colors and markers for each automaton
 colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b',
@@ -96,17 +99,24 @@ for automaton_id in sorted(automaton_data.keys()):
     ax2.plot(data['robot_counts'], data['makespans'], 
              marker=markers[automaton_id-1], markersize=8, 
              linewidth=2.5, color=colors[automaton_id-1], 
-             label=f'Automaton {automaton_id}')
+             label=f'Automaton {automaton_id} (Task Allocation)')
+    
+    # Add product makespan overlay if non-zero values exist
+    if any(pm > 0 for pm in data['product_makespans']):
+        ax2.plot(data['robot_counts'], data['product_makespans'], 
+                marker=markers[automaton_id-1], markersize=6, 
+                linewidth=2.5, color=colors[automaton_id-1], linestyle='--',
+                label=f'Automaton {automaton_id} (Product)')
     
     # Add value labels on points
     for r, m in zip(data['robot_counts'], data['makespans']):
         if m > 0:
-            ax2.text(r, m, f'{m:.0f}s', ha='center', va='bottom', fontsize=9)
+            ax2.text(r, m, f'{m:.0f}s', ha='center', va='bottom', fontsize=8)
 
 ax2.set_xlabel('Number of Robots', fontsize=12, fontweight='bold')
 ax2.set_ylabel('Makespan (seconds)', fontsize=12, fontweight='bold')
 ax2.grid(True, alpha=0.3)
-ax2.legend(loc='best', fontsize=10)
+ax2.legend(loc='best', fontsize=9)
 
 plt.tight_layout()
 plt.savefig('Plots/number_robots_makespan.png', dpi=300, bbox_inches='tight')
@@ -150,10 +160,20 @@ for automaton_id in sorted(automaton_data.keys()):
         
         ax.plot(data['robot_counts'], data['makespans'], 
                 marker=markers[automaton_id-1], markersize=10, 
-                linewidth=2.5, color=colors[automaton_id-1])
+                linewidth=2.5, color=colors[automaton_id-1], 
+                label='Task Allocation Makespan')
+        
+        # Add product makespan overlay if non-zero values exist
+        if any(pm > 0 for pm in data['product_makespans']):
+            ax.plot(data['robot_counts'], data['product_makespans'], 
+                    marker='D', markersize=8, 
+                    linewidth=2.5, color='#d62728', linestyle='--',
+                    label='Product Automaton Makespan')
+        
         ax.set_xlabel('Number of Robots', fontsize=12, fontweight='bold')
         ax.set_ylabel('Makespan (seconds)', fontsize=12, fontweight='bold')
         ax.grid(True, alpha=0.3)
+        ax.legend(fontsize=11, loc='best')
         
         # Add value labels
         for r, m in zip(data['robot_counts'], data['makespans']):
