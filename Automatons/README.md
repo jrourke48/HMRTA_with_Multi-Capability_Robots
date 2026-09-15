@@ -271,7 +271,7 @@ The product automaton merges two automaton spaces:
 - **TS Component**: Represents feasible robot motions
 - **Büchi Component**: Represents task progress tracking
 
-**Product State**: `(ts_state, buchi_state)` pair
+**Product State**: `(buchi_state, robot_state1, robot_)` pair
 
 #### Class Definition
 

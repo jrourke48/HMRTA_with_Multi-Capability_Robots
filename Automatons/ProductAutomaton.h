@@ -21,10 +21,11 @@ private:
     std::map<uint16_t, std::string> stateMapping;  // Maps product state ID to its label
     std::vector<uint16_t> acceptingStates;  // Set of accepting states
     spot::twa_graph_ptr spotAutomaton;  // Pointer to the underlying Spot automaton
+    const Environment* envPtr = nullptr;  // Store pointer to Environment for later use
+    const MultiRobotSystem* mrsPtr = nullptr;  // Store pointer to MultiRobotSystem for later use
     
     // DOT parsing helper methods
     void parseProductFromDot(const std::string& dotContent);
-    void parseProductFromDot(const std::string& dotContent, const Environment& env, const MultiRobotSystem& mrs);
     std::string extractLabelFromDotBrackets(const std::string& content) const;
 public:
     ProductAutomaton();
@@ -61,7 +62,7 @@ public:
     std::string replaceLabel(const std::string& oldLabel, const std::string& additionalLabel);
     // Getter for Spot automaton
     spot::twa_graph_ptr getSpotAutomaton() const { return spotAutomaton; }
-    uint32_t getEdgeWeight(Node* srcNode, Node* dstNode, const Environment& env, const MultiRobotSystem& mrs) const;
+    uint32_t getEdgeWeight(Node* srcNode, Node* dstNode) const;
 };
 
 #endif

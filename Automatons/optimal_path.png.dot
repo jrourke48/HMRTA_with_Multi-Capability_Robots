@@ -1,0 +1,100 @@
+digraph ComprehensiveOptimalPath {
+  rankdir=TB;
+  concentrate=true;
+  node [fontname=Arial];
+  edge [fontname=Arial, fontsize=9];
+
+  subgraph cluster_environment {
+    label="Environment & Gridworld";
+    style=filled;
+    fillcolor="#F0F0F0";
+    color=black;
+
+    env_info [shape=box, label="GridWorld: 210x210\nTotal States: 6\nInitial State: 0\n", fillcolor="#E8F4F8"];
+
+    env_tasks [shape=plaintext, label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0">
+        <TR><TD COLSPAN="3"><B>Task Locations</B></TD></TR>
+        <TR><TD><B>State ID</B></TD><TD><B>Position</B></TD><TD><B>Type</B></TD></TR>
+        <TR><TD>0</TD><TD>(180,140)</TD><TD>Task</TD></TR>
+        <TR><TD>1</TD><TD>(180,35)</TD><TD>Task</TD></TR>
+        <TR><TD>2</TD><TD>(120,105)</TD><TD>Task</TD></TR>
+        <TR><TD>3</TD><TD>(45,35)</TD><TD>Task</TD></TR>
+        <TR><TD>4</TD><TD>(45,105)</TD><TD>Task</TD></TR>
+        <TR><TD>5</TD><TD>(45,175)</TD><TD>Task</TD></TR>
+      </TABLE>
+    >];
+  }
+
+  subgraph cluster_robots {
+    label="Robot Team & Capabilities";
+    style=filled;
+    fillcolor="#F0F8F0";
+    color=black;
+
+    team_info [shape=box, label="Team Size: 4 robots\n", fillcolor="#E8F8E8"];
+
+    robot_caps [shape=plaintext, label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0">
+        <TR><TD COLSPAN="3"><B>Robot Capabilities</B></TD></TR>
+        <TR><TD><B>Robot ID</B></TD><TD><B>Name</B></TD><TD><B>Capabilities</B></TD></TR>
+        <TR><TD>R0</TD><TD>Rover_0</TD><TD>Movement_Ground</TD></TR>
+        <TR><TD>R1</TD><TD>Rover_1</TD><TD>Sensor_Camera</TD></TR>
+        <TR><TD>R2</TD><TD>Rover_2</TD><TD>Sensor_GPS</TD></TR>
+        <TR><TD>R3</TD><TD>Rover_3</TD><TD>Movement_Ground</TD></TR>
+      </TABLE>
+    >];
+  }
+
+  subgraph cluster_ltl {
+    label="LTL Formula & Task Constraints";
+    style=filled;
+    fillcolor="#F8F0F0";
+    color=black;
+
+    ltl_info [shape=box, label="LTL Formula Details:\nAutomaton States: 4\nAccepting States: 1\n\n--- LTL FORMULA ---\nGFp1 & GFp2 & GFp3", fillcolor="#F8E8E8"];
+
+    ltl_tasks [shape=plaintext, label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0">
+        <TR><TD COLSPAN="5"><B>Task Requirements (LTL APs)</B></TD></TR>
+        <TR><TD><B>AP ID</B></TD><TD><B>TS Region</B></TD><TD><B>Batch Value</B></TD><TD><B>Type</B></TD><TD><B>Required Capabilities</B></TD></TR>
+        <TR><TD>AP1</TD><TD>TS1</TD><TD>0</TD><TD>Unrelated</TD><TD>Movement_Ground</TD></TR>
+        <TR><TD>AP2</TD><TD>TS2</TD><TD>0</TD><TD>Unrelated</TD><TD>Movement_Ground, Sensor_Camera</TD></TR>
+        <TR><TD>AP3</TD><TD>TS3</TD><TD>0</TD><TD>Unrelated</TD><TD>Movement_Ground, Sensor_GPS</TD></TR>
+      </TABLE>
+    >];
+  }
+
+  subgraph cluster_path {
+    label="Optimal Execution Path";
+    style=filled;
+    fillcolor="#FFF8F0";
+    color=darkred;
+    penwidth=2;
+
+    path_summary [shape=note, label="Optimal Path Summary\nTotal Steps: 8\nFinal Cost: 368\nTotal Execution Time: 1281s\n", fillcolor="#FFFFCC", penwidth=2];
+
+    opt_0 [shape=box, label="Step 0\nNBA: 0 | TS: 0\nCost: 0s | Total: 0s\n-----\nAllocated Robots:\n", fillcolor="#B3E5FC", penwidth=1.5];
+    opt_1 [shape=box, label="Step 1\nNBA: 2 | TS: 3\nCost: 125s | Total: 250s\n-----\nAllocated Robots:\n  R0: 125s\n  R2: 125s\n", fillcolor="#B3E5FC", penwidth=1.5];
+    opt_2 [shape=box, label="Step 2\nNBA: 3 | TS: 2\nCost: 125s | Total: 346s\n-----\nAllocated Robots:\n  R1: 48s\n  R3: 48s\n", fillcolor="#B3E5FC", penwidth=1.5];
+    opt_3 [shape=box, label="Step 3\nNBA: 0 | TS: 1\nCost: 208s | Total: 506s\n-----\nAllocated Robots:\n  R3: 208s\n", fillcolor="#B3E5FC", penwidth=1.5];
+    opt_4 [shape=box, label="Step 4\nNBA: 2 | TS: 3\nCost: 208s | Total: 564s\n-----\nAllocated Robots:\n  R0: 154s\n  R2: 154s\n", fillcolor="#B3E5FC", penwidth=1.5];
+    opt_5 [shape=box, label="Step 5\nNBA: 3 | TS: 2\nCost: 285s | Total: 932s\n-----\nAllocated Robots:\n  R0: 285s\n  R1: 285s\n", fillcolor="#B3E5FC", penwidth=1.5];
+    opt_6 [shape=box, label="Step 6\nNBA: 0 | TS: 1\nCost: 368s | Total: 1092s\n-----\nAllocated Robots:\n  R3: 368s\n", fillcolor="#B3E5FC", penwidth=1.5];
+    opt_7 [shape=box, label="Step 7\nNBA: 2 | TS: 3\nCost: 368s | Total: 1281s\n-----\nAllocated Robots:\n  R0: 314s\n  R2: 314s\n", fillcolor="#FF6B6B", penwidth=3, color=darkred, fontweight=bold, fontsize=11];
+
+    opt_0 -> opt_1 [label="Δ=125s", penwidth=2, color=darkred];
+    opt_1 -> opt_2 [label="Δ=0s", penwidth=2, color=darkred];
+    opt_2 -> opt_3 [label="Δ=83s", penwidth=2, color=darkred];
+    opt_3 -> opt_4 [label="Δ=0s", penwidth=2, color=darkred];
+    opt_4 -> opt_5 [label="Δ=77s", penwidth=2, color=darkred];
+    opt_5 -> opt_6 [label="Δ=83s", penwidth=2, color=darkred];
+    opt_6 -> opt_7 [label="Δ=0s", penwidth=2, color=darkred];
+  }
+
+  // Connections between clusters
+  env_info -> path_summary [style=dashed, color=gray, label="tasks"];
+  team_info -> path_summary [style=dashed, color=gray, label="robots"];
+  ltl_info -> path_summary [style=dashed, color=gray, label="constraints"];
+
+}
