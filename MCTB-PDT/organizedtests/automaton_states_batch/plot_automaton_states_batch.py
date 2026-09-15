@@ -44,7 +44,8 @@ for csv_file in sorted(csv_files):
             metrics = {
                 'automaton_states': int(row['num_automaton_states']),
                 'total_computation_time_ms': float(row['total_computation_time_ms']),
-                'makespan': float(row['tree_makespan_seconds']) if 'tree_makespan_seconds' in row and row['tree_makespan_seconds'] else 0
+                'makespan': float(row['tree_makespan_seconds']) if 'tree_makespan_seconds' in row and row['tree_makespan_seconds'] else 0,
+                'product_makespan': float(row['product_makespan_seconds']) if 'product_makespan_seconds' in row and row['product_makespan_seconds'] else 0
             }
             
             # Store in appropriate dict based on configuration
@@ -66,18 +67,22 @@ automaton_ids_es_cs = sorted(data_es_cs.keys())
 times_us = [data_us[aid]["total_computation_time_ms"] for aid in automaton_ids_us]
 states_us = [data_us[aid]["automaton_states"] for aid in automaton_ids_us]
 makespans_us = [data_us[aid]["makespan"] for aid in automaton_ids_us]
+product_makespans_us = [data_us[aid]["product_makespan"] for aid in automaton_ids_us]
 
 times_cs = [data_cs[aid]["total_computation_time_ms"] for aid in automaton_ids_cs]
 states_cs = [data_cs[aid]["automaton_states"] for aid in automaton_ids_cs]
 makespans_cs = [data_cs[aid]["makespan"] for aid in automaton_ids_cs]
+product_makespans_cs = [data_cs[aid]["product_makespan"] for aid in automaton_ids_cs]
 
 times_es = [data_es[aid]["total_computation_time_ms"] for aid in automaton_ids_es]
 states_es = [data_es[aid]["automaton_states"] for aid in automaton_ids_es]
 makespans_es = [data_es[aid]["makespan"] for aid in automaton_ids_es]
+product_makespans_es = [data_es[aid]["product_makespan"] for aid in automaton_ids_es]
 
 times_es_cs = [data_es_cs[aid]["total_computation_time_ms"] for aid in automaton_ids_es_cs]
 states_es_cs = [data_es_cs[aid]["automaton_states"] for aid in automaton_ids_es_cs]
 makespans_es_cs = [data_es_cs[aid]["makespan"] for aid in automaton_ids_es_cs]
+product_makespans_es_cs = [data_es_cs[aid]["product_makespan"] for aid in automaton_ids_es_cs]
 
 # Create separate figures for each batch configuration
 # ============================================================================

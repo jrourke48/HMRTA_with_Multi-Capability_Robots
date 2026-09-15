@@ -43,7 +43,8 @@ for csv_file in sorted(csv_files):
             metrics = {
                 'automaton_states': int(row['num_automaton_states']),
                 'total_computation_time_ms': float(row['total_computation_time_ms']),
-                'makespan': float(row['tree_makespan_seconds']) if 'tree_makespan_seconds' in row and row['tree_makespan_seconds'] else 0
+                'makespan': float(row['tree_makespan_seconds']) if 'tree_makespan_seconds' in row and row['tree_makespan_seconds'] else 0,
+                'product_makespan': float(row['product_makespan_seconds']) if 'product_makespan_seconds' in row and row['product_makespan_seconds'] else 0
             }
             
             # Store in appropriate dict
@@ -65,18 +66,22 @@ automaton_ids_45 = sorted(data_45robots.keys())
 times_3robots = [data_3robots[aid]["total_computation_time_ms"] for aid in automaton_ids_3]
 states_3robots = [data_3robots[aid]["automaton_states"] for aid in automaton_ids_3]
 makespans_3robots = [data_3robots[aid]["makespan"] for aid in automaton_ids_3]
+product_makespans_3robots = [data_3robots[aid]["product_makespan"] for aid in automaton_ids_3]
 
 times_6robots = [data_6robots[aid]["total_computation_time_ms"] for aid in automaton_ids_6]
 states_6robots = [data_6robots[aid]["automaton_states"] for aid in automaton_ids_6]
 makespans_6robots = [data_6robots[aid]["makespan"] for aid in automaton_ids_6]
+product_makespans_6robots = [data_6robots[aid]["product_makespan"] for aid in automaton_ids_6]
 
 times_15robots = [data_15robots[aid]["total_computation_time_ms"] for aid in automaton_ids_15]
 states_15robots = [data_15robots[aid]["automaton_states"] for aid in automaton_ids_15]
 makespans_15robots = [data_15robots[aid]["makespan"] for aid in automaton_ids_15]
+product_makespans_15robots = [data_15robots[aid]["product_makespan"] for aid in automaton_ids_15]
 
 times_45robots = [data_45robots[aid]["total_computation_time_ms"] for aid in automaton_ids_45]
 states_45robots = [data_45robots[aid]["automaton_states"] for aid in automaton_ids_45]
 makespans_45robots = [data_45robots[aid]["makespan"] for aid in automaton_ids_45]
+product_makespans_45robots = [data_45robots[aid]["product_makespan"] for aid in automaton_ids_45]
 
 # Create separate figures for each robot count
 # ============================================================================
@@ -171,14 +176,21 @@ if any(makespans_3robots):
     fig5.suptitle('Automaton Complexity vs Makespan (3-Robot Team)', fontsize=16, fontweight='bold')
 
     ax5.plot(states_3robots, makespans_3robots, marker='o', markersize=8, 
-             linewidth=2.5, color='#1f77b4', label='3-Robot Team')
+             linewidth=2.5, color='#1f77b4', label='Tree Makespan (Task Allocation)')
+    
+    # Add product makespan overlay if non-zero values exist
+    if any(product_makespans_3robots):
+        ax5.plot(states_3robots, product_makespans_3robots, marker='s', markersize=8, 
+                 linewidth=2.5, color='#d62728', linestyle='--', label='Product Automaton Makespan')
+    
     ax5.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
     ax5.set_ylabel('Makespan (seconds)', fontsize=12, fontweight='bold')
     ax5.grid(True, alpha=0.3)
+    ax5.legend(fontsize=11, loc='best')
 
     # Add value labels on points
     for i, (s, m) in enumerate(zip(states_3robots, makespans_3robots)):
-        ax5.text(s, m, f'{m:.2f}s', ha='center', va='bottom', fontweight='bold')
+        ax5.text(s, m, f'{m:.2f}s', ha='center', va='bottom', fontweight='bold', fontsize=9)
 
     plt.tight_layout()
     plt.savefig('Plots/automaton_makespan_3robots.png', dpi=300, bbox_inches='tight')
@@ -193,14 +205,21 @@ if any(makespans_6robots):
     fig6.suptitle('Automaton Complexity vs Makespan (6-Robot Team)', fontsize=16, fontweight='bold')
 
     ax6.plot(states_6robots, makespans_6robots, marker='s', markersize=8, 
-             linewidth=2.5, color='#ff7f0e', label='6-Robot Team')
+             linewidth=2.5, color='#ff7f0e', label='Tree Makespan (Task Allocation)')
+    
+    # Add product makespan overlay if non-zero values exist
+    if any(product_makespans_6robots):
+        ax6.plot(states_6robots, product_makespans_6robots, marker='^', markersize=8, 
+                 linewidth=2.5, color='#d62728', linestyle='--', label='Product Automaton Makespan')
+    
     ax6.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
     ax6.set_ylabel('Makespan (seconds)', fontsize=12, fontweight='bold')
     ax6.grid(True, alpha=0.3)
+    ax6.legend(fontsize=11, loc='best')
 
     # Add value labels on points
     for i, (s, m) in enumerate(zip(states_6robots, makespans_6robots)):
-        ax6.text(s, m, f'{m:.2f}s', ha='center', va='bottom', fontweight='bold')
+        ax6.text(s, m, f'{m:.2f}s', ha='center', va='bottom', fontweight='bold', fontsize=9)
 
     plt.tight_layout()
     plt.savefig('Plots/automaton_makespan_6robots.png', dpi=300, bbox_inches='tight')
@@ -215,14 +234,21 @@ if any(makespans_15robots):
     fig7.suptitle('Automaton Complexity vs Makespan (15-Robot Team)', fontsize=16, fontweight='bold')
 
     ax7.plot(states_15robots, makespans_15robots, marker='^', markersize=8, 
-             linewidth=2.5, color='#2ca02c', label='15-Robot Team')
+             linewidth=2.5, color='#2ca02c', label='Tree Makespan (Task Allocation)')
+    
+    # Add product makespan overlay if non-zero values exist
+    if any(product_makespans_15robots):
+        ax7.plot(states_15robots, product_makespans_15robots, marker='D', markersize=8, 
+                 linewidth=2.5, color='#d62728', linestyle='--', label='Product Automaton Makespan')
+    
     ax7.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
     ax7.set_ylabel('Makespan (seconds)', fontsize=12, fontweight='bold')
     ax7.grid(True, alpha=0.3)
+    ax7.legend(fontsize=11, loc='best')
 
     # Add value labels on points
     for i, (s, m) in enumerate(zip(states_15robots, makespans_15robots)):
-        ax7.text(s, m, f'{m:.2f}s', ha='center', va='bottom', fontweight='bold')
+        ax7.text(s, m, f'{m:.2f}s', ha='center', va='bottom', fontweight='bold', fontsize=9)
 
     plt.tight_layout()
     plt.savefig('Plots/automaton_makespan_15robots.png', dpi=300, bbox_inches='tight')
@@ -237,14 +263,21 @@ if any(makespans_45robots):
     fig8.suptitle('Automaton Complexity vs Makespan (45-Robot Team)', fontsize=16, fontweight='bold')
 
     ax8.plot(states_45robots, makespans_45robots, marker='D', markersize=8, 
-             linewidth=2.5, color='#d62728', label='45-Robot Team')
+             linewidth=2.5, color='#d62728', label='Tree Makespan (Task Allocation)')
+    
+    # Add product makespan overlay if non-zero values exist
+    if any(product_makespans_45robots):
+        ax8.plot(states_45robots, product_makespans_45robots, marker='*', markersize=12, 
+                 linewidth=2.5, color='#2ca02c', linestyle='--', label='Product Automaton Makespan')
+    
     ax8.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
     ax8.set_ylabel('Makespan (seconds)', fontsize=12, fontweight='bold')
     ax8.grid(True, alpha=0.3)
+    ax8.legend(fontsize=11, loc='best')
 
     # Add value labels on points
     for i, (s, m) in enumerate(zip(states_45robots, makespans_45robots)):
-        ax8.text(s, m, f'{m:.2f}s', ha='center', va='bottom', fontweight='bold')
+        ax8.text(s, m, f'{m:.2f}s', ha='center', va='bottom', fontweight='bold', fontsize=9)
 
     plt.tight_layout()
     plt.savefig('Plots/automaton_makespan_45robots.png', dpi=300, bbox_inches='tight')
@@ -284,20 +317,35 @@ fig10.suptitle('Automaton Complexity vs Makespan (All Configurations)', fontsize
 
 if any(makespans_3robots):
     ax10.plot(states_3robots, makespans_3robots, marker='o', markersize=8, 
-             linewidth=2.5, color='#1f77b4', label='3-Robot Team')
+             linewidth=2.5, color='#1f77b4', label='3-Robot (Task Allocation)')
+if any(product_makespans_3robots):
+    ax10.plot(states_3robots, product_makespans_3robots, marker='o', markersize=6, 
+             linewidth=2.5, color='#1f77b4', linestyle='--', label='3-Robot (Product)')
+    
 if any(makespans_6robots):
     ax10.plot(states_6robots, makespans_6robots, marker='s', markersize=8, 
-             linewidth=2.5, color='#ff7f0e', label='6-Robot Team')
+             linewidth=2.5, color='#ff7f0e', label='6-Robot (Task Allocation)')
+if any(product_makespans_6robots):
+    ax10.plot(states_6robots, product_makespans_6robots, marker='s', markersize=6, 
+             linewidth=2.5, color='#ff7f0e', linestyle='--', label='6-Robot (Product)')
+    
 if any(makespans_15robots):
     ax10.plot(states_15robots, makespans_15robots, marker='^', markersize=8, 
-             linewidth=2.5, color='#2ca02c', label='15-Robot Team')
+             linewidth=2.5, color='#2ca02c', label='15-Robot (Task Allocation)')
+if any(product_makespans_15robots):
+    ax10.plot(states_15robots, product_makespans_15robots, marker='^', markersize=6, 
+             linewidth=2.5, color='#2ca02c', linestyle='--', label='15-Robot (Product)')
+    
 if any(makespans_45robots):
     ax10.plot(states_45robots, makespans_45robots, marker='D', markersize=8, 
-             linewidth=2.5, color='#d62728', label='45-Robot Team')
+             linewidth=2.5, color='#d62728', label='45-Robot (Task Allocation)')
+if any(product_makespans_45robots):
+    ax10.plot(states_45robots, product_makespans_45robots, marker='D', markersize=6, 
+             linewidth=2.5, color='#d62728', linestyle='--', label='45-Robot (Product)')
 
 ax10.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
 ax10.set_ylabel('Makespan (seconds)', fontsize=12, fontweight='bold')
-ax10.legend(fontsize=11, loc='best')
+ax10.legend(fontsize=10, loc='best')
 ax10.grid(True, alpha=0.3)
 
 plt.tight_layout()

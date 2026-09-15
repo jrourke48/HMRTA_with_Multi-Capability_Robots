@@ -36,7 +36,8 @@ for csv_file in sorted(csv_files):
     config_data[config_key] = {
         'homogeneities': [],
         'computation_times': [],
-        'makespans': []
+        'makespans': [],
+        'product_makespans': []
     }
     
     # Read CSV file
@@ -51,10 +52,12 @@ for csv_file in sorted(csv_files):
         homogeneity = float(row['robot_homogeneity'])
         computation_time = float(row['total_computation_time_ms'])
         makespan = float(row['tree_makespan_seconds']) if 'tree_makespan_seconds' in row and row['tree_makespan_seconds'].strip() else 0
+        product_makespan = float(row['product_makespan_seconds']) if 'product_makespan_seconds' in row and row['product_makespan_seconds'].strip() else 0
         
         config_data[config_key]['homogeneities'].append(homogeneity)
         config_data[config_key]['computation_times'].append(computation_time)
         config_data[config_key]['makespans'].append(makespan)
+        config_data[config_key]['product_makespans'].append(product_makespan)
 
 # Define colors for each robot configuration
 robot_colors = {6: '#1f77b4', 10: '#ff7f0e', 16: '#2ca02c'}
@@ -96,20 +99,27 @@ fig2.suptitle('Robot Homogeneity vs Makespan (All Configurations)', fontsize=16,
 
 for (automaton_id, robot_count) in sorted(config_data.keys()):
     data = config_data[(automaton_id, robot_count)]
-    label = f'Auto {automaton_id}, {robot_count} Robots'
+    label = f'Auto {automaton_id}, {robot_count} Robots (Task Allocation)'
     ax2.plot(data['homogeneities'], data['makespans'], 
              marker=robot_markers[robot_count], markersize=8, 
              linewidth=2.5, label=label)
     
+    # Add product makespan overlay if non-zero values exist
+    if any(pm > 0 for pm in data['product_makespans']):
+        label_prod = f'Auto {automaton_id}, {robot_count} Robots (Product)'
+        ax2.plot(data['homogeneities'], data['product_makespans'], 
+                marker=robot_markers[robot_count], markersize=6, 
+                linewidth=2.5, linestyle='--', label=label_prod)
+    
     # Add value labels on points
     for hom, m in zip(data['homogeneities'], data['makespans']):
         if m > 0:
-            ax2.text(hom, m, f'{m:.0f}s', ha='center', va='bottom', fontsize=8)
+            ax2.text(hom, m, f'{m:.0f}s', ha='center', va='bottom', fontsize=7)
 
 ax2.set_xlabel('Robot Homogeneity (Independent Caps / Num Robots)', fontsize=12, fontweight='bold')
 ax2.set_ylabel('Makespan (seconds)', fontsize=12, fontweight='bold')
 ax2.grid(True, alpha=0.3)
-ax2.legend(loc='best', fontsize=9)
+ax2.legend(loc='best', fontsize=8)
 
 plt.tight_layout()
 plt.savefig('Plots/robot_homogeneity_makespan_all.png', dpi=300, bbox_inches='tight')
@@ -160,12 +170,19 @@ for robot_count in [6, 10, 16]:
             ax.plot(data['homogeneities'], data['makespans'], 
                     marker='o', markersize=8, 
                     linewidth=2.5, color=automaton_colors[automaton_id-1],
-                    label=f'Automaton {automaton_id}')
+                    label=f'Automaton {automaton_id} (Task Allocation)')
+            
+            # Add product makespan overlay if non-zero values exist
+            if any(pm > 0 for pm in data['product_makespans']):
+                ax.plot(data['homogeneities'], data['product_makespans'], 
+                        marker='s', markersize=6, 
+                        linewidth=2.5, color=automaton_colors[automaton_id-1], linestyle='--',
+                        label=f'Automaton {automaton_id} (Product)')
     
     ax.set_xlabel('Robot Homogeneity (Independent Caps / Num Robots)', fontsize=12, fontweight='bold')
     ax.set_ylabel('Makespan (seconds)', fontsize=12, fontweight='bold')
     ax.grid(True, alpha=0.3)
-    ax.legend(loc='best', fontsize=10)
+    ax.legend(loc='best', fontsize=9)
     
     plt.tight_layout()
     plt.savefig(f'Plots/robot_homogeneity_makespan_{robot_count}robots.png', dpi=300, bbox_inches='tight')

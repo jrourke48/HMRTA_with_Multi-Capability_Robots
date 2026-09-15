@@ -141,28 +141,31 @@ int main() {
                 double memAfter = getMemoryUsageMB();
                 double memUsed = memAfter - memBefore;
                 allocAlg->getMetrics().setTaskMemoryUsageMB(memUsed);
-                // bool shouldSkip = (robotCount > 10) && (buchi->getNumStates()*std::pow(ts->getNumStates(), robotCount) > UINT16_MAX/2);
-                // if (!shouldSkip) {
-                //     //buld the product automaton and store its metrics
-                //     double memBeforeProduct = getMemoryUsageMB();
-                //     double startTimeProduct = std::chrono::high_resolution_clock::now().time_since_epoch().count();
-                //     ProductAutomaton product(*env, *mrs, *buchi);
-                //     std::tuple<std::vector<uint16_t>, uint32_t> optimalPath = product.OptimalAcceptingPath();
-                //     double memAfterProduct = getMemoryUsageMB();
-                //     double endTimeProduct = std::chrono::high_resolution_clock::now().time_since_epoch().count();
-                //     double memUsedProduct = memAfterProduct - memBeforeProduct;
+                bool shouldSkip = (robotCount > 5) && (buchi->getNumStates()*std::pow(ts->getNumStates(), robotCount) > UINT16_MAX/2);
+                if (!shouldSkip) {
+                    //buld the product automaton and store its metrics
+                    double memBeforeProduct = getMemoryUsageMB();
+                    double startTimeProduct = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+                    std::cout << "DEBUG: Creating ProductAutomaton for automaton " << automatonId << "..." << std::endl;
+                    ProductAutomaton productAutomaton(*env, *mrs, *buchi);
+                    std::cout << "DEBUG: ProductAutomaton created successfully. Calling OptimalAcceptingPath()..." << std::endl;
+                    std::tuple<std::vector<uint16_t>, uint32_t> optimalPath = productAutomaton.OptimalAcceptingPath();
+                    std::cout << "DEBUG: OptimalAcceptingPath() completed successfully" << std::endl;
+                    double memAfterProduct = getMemoryUsageMB();
+                    double endTimeProduct = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+                    double memUsedProduct = memAfterProduct - memBeforeProduct;
                     
-                //     //add the full product automaton metrics to the algorithm metrics
-                //     allocAlg->getMetrics().setFullProductAutomatonMetrics(
-                //         product.getNumStates(),
-                //         product.getNumEdges(),
-                //         std::get<1>(optimalPath), // makespan for product
-                //         (endTimeProduct - startTimeProduct) / 1e6,  // convert from nanoseconds to milliseconds
-                //         memUsedProduct
-                //     );
-                //     // Compute derived metrics after setting full product automaton metrics
-                //     allocAlg->getMetrics().computeDerivedMetrics();
-                // }
+                    //add the full product automaton metrics to the algorithm metrics
+                    allocAlg->getMetrics().setFullProductAutomatonMetrics(
+                        productAutomaton.getNumStates(),
+                        productAutomaton.getNumEdges(),
+                        std::get<1>(optimalPath), // makespan for product
+                        (endTimeProduct - startTimeProduct) / 1e6,  // convert from nanoseconds to milliseconds
+                        memUsedProduct
+                    );
+                    // Compute derived metrics after setting full product automaton metrics
+                    allocAlg->getMetrics().computeDerivedMetrics();
+                }
 
                 allocAlg->getMetrics().printSummary();
                 
@@ -240,7 +243,8 @@ BuchiAutomaton* createTestInfiniteBuchiAutomaton1() {
     batchAPs.push_back(BatchAtomicProposition(0, 0, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
     batchAPs.push_back(BatchAtomicProposition(2, 2, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
     
-    LTLFormula* ltlFormula = new LTLFormula(ltl_str, batchAPs);
+    // Store LTLFormula in static variable to keep it alive for the entire program
+    static LTLFormula* ltlFormula = new LTLFormula(ltl_str, batchAPs);
     BuchiAutomaton* buchi = new BuchiAutomaton(ltlFormula);
     buchi->visualize("output/automaton_test_infinite_1.dot");
     return buchi;
@@ -261,7 +265,7 @@ BuchiAutomaton* createTestInfiniteBuchiAutomaton2() {
     batchAPs.push_back(BatchAtomicProposition(2, 2, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
     batchAPs.push_back(BatchAtomicProposition(3, 3, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
 
-    LTLFormula* ltlFormula = new LTLFormula(ltl_str, batchAPs);
+    static LTLFormula* ltlFormula = new LTLFormula(ltl_str, batchAPs);
     BuchiAutomaton* buchi = new BuchiAutomaton(ltlFormula);
     return buchi;
 }
