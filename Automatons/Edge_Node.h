@@ -140,21 +140,27 @@ public:
         //get the product states for this node
         std::pair<uint16_t, std::vector<uint16_t>> getProductStates() const { return productStates; };
         void setProductStates(const std::string& label) {
-            // Assuming the label format is "Product,buchistate,robot1state,robot2state,..."
+            // Label format is "buchistate,robot1state,robot2state,robot3state,..."
             std::vector<uint16_t> states;
-            size_t pos = label.find(',');
-            if (pos != std::string::npos) {
-                size_t next_pos = label.find(',', pos + 1);
-                if (next_pos != std::string::npos) {
-                    uint16_t buchistate = static_cast<uint16_t>(std::stoul(label.substr(pos + 1, next_pos - pos - 1)));
-                    pos = next_pos;
-                    while ((next_pos = label.find(',', pos + 1)) != std::string::npos) {
-                        states.push_back(static_cast<uint16_t>(std::stoul(label.substr(pos + 1, next_pos - pos - 1))));
-                        pos = next_pos;
-                    }
-                    states.push_back(static_cast<uint16_t>(std::stoul(label.substr(pos + 1))));
-                    productStates = std::make_pair(buchistate, states);
+            size_t pos = 0;
+            size_t next_pos = label.find(',', pos);
+            
+            if (next_pos != std::string::npos) {
+                // Extract buchistate
+                uint16_t buchistate = static_cast<uint16_t>(std::stoul(label.substr(pos, next_pos - pos)));
+                pos = next_pos + 1;
+                
+                // Extract all robot states
+                while ((next_pos = label.find(',', pos)) != std::string::npos) {
+                    states.push_back(static_cast<uint16_t>(std::stoul(label.substr(pos, next_pos - pos))));
+                    pos = next_pos + 1;
                 }
+                // Get last robot state
+                if (pos < label.length()) {
+                    states.push_back(static_cast<uint16_t>(std::stoul(label.substr(pos))));
+                }
+                
+                productStates = std::make_pair(buchistate, states);
             }
         }
         //add an edge to this node

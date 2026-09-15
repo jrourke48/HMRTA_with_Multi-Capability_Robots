@@ -35,6 +35,10 @@ ProductAutomaton::ProductAutomaton(spot::twa_graph_ptr spotAutomaton) {
  * This constructor builds the synchronized product of the TS for each robot and the Buchi automaton.
  */
 ProductAutomaton::ProductAutomaton(const Environment& env, const MultiRobotSystem& mrs, const BuchiAutomaton& buchiAutomaton) {
+    // Store pointers to env and mrs for later use
+    envPtr = &env;
+    mrsPtr = &mrs;
+    
     // Initialize product automaton based on the individual components
     // This is a placeholder implementation and should be replaced with actual logic
     if (buchiAutomaton.getNumStates()*std::pow(5/6*env.getTransitionSystem()->getNumStates() , mrs.getNumRobots()) > UINT16_MAX) {
@@ -124,29 +128,78 @@ ProductAutomaton::ProductAutomaton(const Environment& env, const MultiRobotSyste
     cartesianProduct->set_init_state(0);
     
     // Add transitions: for each cartesian state, enumerate possible moves
+    // Robots can move in ANY COMBINATION (in parallel), not just one at a time
     for (size_t cartIdx = 0; cartIdx < cartesianStates.size(); ++cartIdx) {
         const auto& currentCombo = cartesianStates[cartIdx];
         
-        // Try moving each robot independently
-        for (uint8_t robot = 0; robot < numRobots; ++robot) {
-            uint16_t srcRobotState = currentCombo[robot];
+        // Generate all non-empty subsets of robots (each subset can move together)
+        for (uint8_t mask = 1; mask < (1 << numRobots); ++mask) {
+            // mask represents which robots move: bit i set means robot i moves
             
-            // Assume TS is fully connected: each robot can transition from any state to any other state it has
-            for (uint16_t dstRobotState : robotStates[robot]) {
-                if (dstRobotState == srcRobotState) continue;  // Skip self-loop
-                
-                // Build the destination cartesian state
-                std::vector<uint16_t> nextCombo = currentCombo;
-                nextCombo[robot] = dstRobotState;
-                
-                // Find the index of this new state in cartesianStates
-                auto it = std::find(cartesianStates.begin(), cartesianStates.end(), nextCombo);
-                if (it != cartesianStates.end()) {
-                    uint16_t dstCartIdx = std::distance(cartesianStates.begin(), it);
-                    // Add transition with true (any AP)
-                    cartesianProduct->new_edge(cartIdx, dstCartIdx, bddtrue);
+            // Lambda to recursively generate all destination combinations for the moving robots
+            std::function<void(int, std::vector<uint16_t>&)> generateDestinations =
+                [&](int robotIdx, std::vector<uint16_t>& nextCombo) {
+                if (robotIdx == numRobots) {
+                    // Found a complete destination combo - now create edge to it
+                    auto it = std::find(cartesianStates.begin(), cartesianStates.end(), nextCombo);
+                    if (it != cartesianStates.end()) {
+                        uint16_t dstCartIdx = std::distance(cartesianStates.begin(), it);
+                        
+                        // Label edge with COMPLETE proposition evaluation at destination state
+                        bdd edgeLabel = bddtrue;
+                        
+                        for (const auto& batchAP : batchAPs) {
+                            uint16_t apNodeId = batchAP.getAP();
+                            uint16_t apId = batchAP.getAPId();
+                            bool apSatisfied = false;
+                            
+                            // Check if ANY robot is at the AP's node
+                            for (uint16_t robotPos : nextCombo) {
+                                if (robotPos == apNodeId) {
+                                    apSatisfied = true;
+                                    break;
+                                }
+                            }
+                            
+                            std::string apName = "p" + std::to_string(apId);
+                            spot::formula ap_formula = spot::formula::ap(apName);
+                            auto& vm = buchiSpot->get_dict()->var_map;
+                            auto it_ap = vm.find(ap_formula);
+                            
+                            if (it_ap != vm.end()) {
+                                int varNum = it_ap->second;
+                                bdd apVar = bdd_ithvar(varNum);
+                                
+                                if (apSatisfied) {
+                                    edgeLabel &= apVar;
+                                } else {
+                                    edgeLabel &= !apVar;
+                                }
+                            }
+                        }
+                        
+                        cartesianProduct->new_edge(cartIdx, dstCartIdx, edgeLabel);
+                    }
+                    return;
                 }
-            }
+                
+                if (mask & (1 << robotIdx)) {
+                    // Robot robotIdx is in the moving set - try all its destination states
+                    uint16_t srcRobotState = currentCombo[robotIdx];
+                    for (uint16_t dstRobotState : robotStates[robotIdx]) {
+                        if (dstRobotState == srcRobotState) continue;  // Skip staying in same state
+                        nextCombo[robotIdx] = dstRobotState;
+                        generateDestinations(robotIdx + 1, nextCombo);
+                    }
+                } else {
+                    // Robot robotIdx is not moving - it stays in place
+                    nextCombo[robotIdx] = currentCombo[robotIdx];
+                    generateDestinations(robotIdx + 1, nextCombo);
+                }
+            };
+            
+            std::vector<uint16_t> nextCombo = currentCombo;
+            generateDestinations(0, nextCombo);
         }
     }
     
@@ -157,7 +210,6 @@ ProductAutomaton::ProductAutomaton(const Environment& env, const MultiRobotSyste
     
     // do the final synchronization of the product automaton
     productSpot = spot::product(buchiSpot, productSpot);
-
     // Export and update state mapping for final product
     std::ostringstream finalDotStream;
     spot::print_dot(finalDotStream, productSpot);
@@ -171,7 +223,7 @@ ProductAutomaton::ProductAutomaton(const Environment& env, const MultiRobotSyste
     // This will use the stateMapping we just populated above
     std::ostringstream dotStream;
     spot::print_dot(dotStream, productSpot);
-    parseProductFromDot(dotStream.str(), env, mrs);
+    parseProductFromDot(dotStream.str());
 }
 
 // Returns the optimal accepting path and its cumulative cost in the product automaton using a modified Dijkstra's algorithm.
@@ -386,8 +438,8 @@ std::tuple<std::vector<uint16_t>, uint32_t> ProductAutomaton::OptimalAcceptingPa
 }
 
 
-// Parse product automaton from DOT representation with Edge weights
-void ProductAutomaton::parseProductFromDot(const std::string& dotContent, const Environment& env, const MultiRobotSystem& mrs) {
+// Parse product automaton from DOT representation (uses member variables envPtr and mrsPtr)
+void ProductAutomaton::parseProductFromDot(const std::string& dotContent) {
     std::istringstream stream(dotContent);
     std::string line;
     std::map<unsigned, std::vector<std::pair<unsigned, std::string>>> edges;
@@ -400,7 +452,7 @@ void ProductAutomaton::parseProductFromDot(const std::string& dotContent, const 
         Node* node = new Node(nodeId, label, true);
         add_Node(node);
     }
-    
+
     while (std::getline(stream, line)) {
         
         // Trim line
@@ -449,7 +501,12 @@ void ProductAutomaton::parseProductFromDot(const std::string& dotContent, const 
         }
     }
     
-    // Add edges
+    // Add edges - use member variables (envPtr and mrsPtr must be valid)
+    if (envPtr == nullptr || mrsPtr == nullptr) {
+        std::cerr << "ERROR: Environment or MultiRobotSystem pointers are null in parseProductFromDot!" << std::endl;
+        return;
+    }
+    
     for (const auto& srcEntry : edges) {
         Node* srcNode = getNode(static_cast<uint16_t>(srcEntry.first));
         if (srcNode != nullptr) {
@@ -459,11 +516,11 @@ void ProductAutomaton::parseProductFromDot(const std::string& dotContent, const 
                 if (dst <= UINT16_MAX) {
                     Node* dstNode = getNode(static_cast<uint16_t>(dst));
                     if (dstNode != nullptr) {
-                        uint32_t wght = getEdgeWeight(srcNode, dstNode, env, mrs);
+                        uint32_t wght = getEdgeWeight(srcNode, dstNode);
                         // Only add edge if weight is positive
                         if (wght > 0) {
-                            Edge e(static_cast<uint16_t>(dst), wght);
-                            srcNode->addEdge(e);
+                            Edge edge_obj(static_cast<uint16_t>(dst), wght);
+                            srcNode->addEdge(edge_obj);
                             numEdges++;
                         }
                     }
@@ -725,133 +782,66 @@ void ProductAutomaton::initCartesianStateMapping(std::vector<std::vector<uint16_
         stateMapping[productState] = label;
     }
 }
-uint32_t ProductAutomaton::getEdgeWeight(Node* srcNode, Node* dstNode, const Environment& env, const MultiRobotSystem& mrs) const {
+uint32_t ProductAutomaton::getEdgeWeight(Node* srcNode, Node* dstNode) const {
     // Defensive checks
     if (srcNode == nullptr || dstNode == nullptr) {
         std::cerr << "ERROR: getEdgeWeight called with null node!" << std::endl;
         return 0;
     }
     
+    // MUST use member variables - env and mrs must be valid at this point
+    if (envPtr == nullptr || mrsPtr == nullptr) {
+        std::cerr << "ERROR: Environment or MultiRobotSystem pointers are null in getEdgeWeight!" << std::endl;
+        return 0;
+    }
+    
     uint16_t maxtime = 0;
     
     try {
-        std::vector<uint16_t> srcProductStates = srcNode->getProductStates().second;  //get the src nodes product states
-        std::vector<uint16_t> dstProductStates = dstNode->getProductStates().second;  //get the dst nodes product states
+        std::vector<uint16_t> srcProductStates = srcNode->getProductStates().second;
+        std::vector<uint16_t> dstProductStates = dstNode->getProductStates().second;
         
         // If product states are empty, return 0 (no weight can be computed)
         if (srcProductStates.empty() || dstProductStates.empty()) {
-            std::cout << "      [DEBUG] Empty product states - src=" << srcProductStates.size() << ", dst=" << dstProductStates.size() << std::endl;
             return 0;
         }
         
         for (size_t i = 0; i < srcProductStates.size(); ++i) {
             uint16_t srcState = srcProductStates[i];
             uint16_t dstState = (i < dstProductStates.size()) ? dstProductStates[i] : srcState;
+            
             if (srcState != dstState) {
                 // Bounds check on robot index
-                if (i >= mrs.getNumRobots()) {
-                    std::cerr << "ERROR: Robot index " << i << " exceeds " << mrs.getNumRobots() << " robots!" << std::endl;
+                if (i >= mrsPtr->getNumRobots()) {
+                    std::cerr << "ERROR: Robot index " << i << " exceeds " << mrsPtr->getNumRobots() << " robots!" << std::endl;
                     continue;
                 }
                 
-                uint16_t weight = mrs.getRobot(i)->getTravelTime(env.TSStateIdToGridCenter(srcState), env.TSStateIdToGridCenter(dstState));  
+                auto robot = mrsPtr->getRobot(i);
+                if (robot == nullptr) {
+                    std::cerr << "ERROR: getRobot returned nullptr for robot " << i << std::endl;
+                    continue;
+                }
+                
+                auto srcGridCenter = envPtr->TSStateIdToGridCenter(srcState);
+                auto dstGridCenter = envPtr->TSStateIdToGridCenter(dstState);
+                
+                uint16_t weight = robot->getTravelTime(srcGridCenter, dstGridCenter);
+                
                 if (weight > maxtime) {
                     maxtime = weight;
                 }
             }
         }
-    } catch (const std::exception& e) {
-        std::cerr << "ERROR in getEdgeWeight: " << e.what() << std::endl;
+    } catch (const std::exception& e_ex) {
+        std::cerr << "ERROR in getEdgeWeight: " << e_ex.what() << std::endl;
+        return 0;
+    } catch (...) {
+        std::cerr << "ERROR in getEdgeWeight: Unknown exception!" << std::endl;
         return 0;
     }
     
     return maxtime;
-}
-
-// Parse product automaton from DOT representation
-void ProductAutomaton::parseProductFromDot(const std::string& dotContent) {
-    std::istringstream stream(dotContent);
-    std::string line;
-    std::map<unsigned, std::vector<std::pair<unsigned, std::string>>> edges;
-    std::set<unsigned> acceptingNodeIds;
-
-    // Create nodes based on all entries in stateMapping (already populated)
-    for (const auto& mappingPair : stateMapping) {
-        uint16_t nodeId = mappingPair.first;
-        const std::string& label = mappingPair.second;
-        Node* node = new Node(nodeId, label, true);
-        add_Node(node);
-    }
-    
-    while (std::getline(stream, line)) {
-        // Trim line
-        line.erase(0, line.find_first_not_of(" \t"));
-        line.erase(line.find_last_not_of(" \t") + 1);
-        
-        if (line.empty() || line[0] == '}' || line[0] == '#') continue;
-        
-        // Check for accepting state marker: peripheries=2
-        size_t bracket_start = line.find('[');
-        if (bracket_start != std::string::npos && line.find("->") == std::string::npos) {
-            unsigned nodeId;
-            std::istringstream iss(line);
-            if (iss >> nodeId) {
-                if (nodeId != UINT_MAX && line.find("peripheries=2") != std::string::npos) {
-                    acceptingNodeIds.insert(nodeId);
-                }
-            }
-            continue;
-        }
-        
-        // Check for edge definition: <src> -> <dst> [label="..."]
-        size_t arrow_pos = line.find("->");
-        if (arrow_pos != std::string::npos) {
-            // Extract source
-            unsigned src;
-            std::istringstream src_stream(line.substr(0, arrow_pos));
-            if (!(src_stream >> src)) continue;
-            
-            // Extract destination
-            size_t after_arrow = arrow_pos + 2;
-            size_t bracket_start = line.find('[', after_arrow);
-            if (bracket_start == std::string::npos) continue;
-            
-            std::string dst_str = line.substr(after_arrow, bracket_start - after_arrow);
-            dst_str.erase(0, dst_str.find_first_not_of(" \t"));
-            dst_str.erase(dst_str.find_last_not_of(" \t") + 1);
-            
-            unsigned dst;
-            if (!(std::istringstream(dst_str) >> dst)) continue;
-            
-            // Skip initial edge (I -> state)
-            if (src == UINT_MAX) continue;
-            
-            edges[src].push_back(std::make_pair(dst, ""));
-        }
-    }
-    
-    // Add edges
-    for (const auto& srcEntry : edges) {
-        Node* srcNode = getNode(static_cast<uint16_t>(srcEntry.first));
-        if (srcNode != nullptr) {
-            for (const auto& dstLabelPair : srcEntry.second) {
-                unsigned dst = dstLabelPair.first;
-                
-                if (dst <= UINT16_MAX) {
-                    Edge e(static_cast<uint16_t>(dst));
-                    srcNode->addEdge(e);
-                    numEdges++;
-                }
-            }
-        }
-    }
-    
-    // Mark accepting states (peripheries=2 in DOT)
-    for (unsigned nodeId : acceptingNodeIds) {
-        if (nodeId <= UINT16_MAX) {
-            setAccepting(static_cast<uint16_t>(nodeId));
-        }
-    }
 }
 
 

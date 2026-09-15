@@ -162,7 +162,7 @@ int main()
         // dotFile.close();
         // std::cout << "✓ Product automaton visualization saved to output/testing_product_automaton.dot\n" << std::endl;
 
-        for (int numRobots = 1; numRobots <= 4; numRobots++) {
+        for (int numRobots = 1; numRobots <= 6; numRobots++) {
             std::cout << "Test " << numRobots << ": Creating " << numRobots << " robot(s)... ";
             std::cout.flush();
             
@@ -180,76 +180,76 @@ int main()
             unsigned long acceptingStates = productAutomaton.getAcceptingStates().size();
             
             double stateRatio = (double)acceptingStates / numStates * 100.0;
-            if (numRobots > 1) {
-                std::cout << numStates << " states, " << acceptingStates << " accepting ("
-                        << std::fixed << std::setprecision(1) << stateRatio << "%)" << std::endl;
-            
-                // Write to CSV
-                csvFile << numRobots << ","
-                        << numStates << "," 
-                        << numEdges << "," 
-                        << acceptingStates << "," 
-                        << stateRatio << "\n";
+            std::cout << numStates << " states, " << acceptingStates << " accepting ("
+                    << std::fixed << std::setprecision(1) << stateRatio << "%)" << std::endl;
+        
+            // Write to CSV
+            csvFile << numRobots << ","
+                    << numStates << "," 
+                    << numEdges << "," 
+                    << acceptingStates << "," 
+                    << stateRatio << "\n";
                 
-                if (numRobots == 2) {
-                    // Visualize the Spot product automaton
-                    std::ofstream dotFile("output/testing_product_automaton_2robots.dot");
-                    spot::print_dot(dotFile, productAutomaton.getSpotAutomaton());
-                    dotFile.close();
-                    std::cout << "  ✓ Product automaton visualization saved to output/testing_product_automaton_2robots.dot\n";
-                }
-                // Test OptimalAcceptingPath algorithm
-                std::cout << "  Testing OptimalAcceptingPath... ";
-                std::tuple<std::vector<uint16_t>, uint32_t> result = productAutomaton.OptimalAcceptingPath();
-                std::vector<uint16_t> path = std::get<0>(result);
+            if (true) {
+                // Visualize the Spot product automaton
+                std::ofstream dotFile("output/testing_product_automaton_2robots.dot");
+                spot::print_dot(dotFile, productAutomaton.getSpotAutomaton());
+                dotFile.close();
+                std::cout << "  ✓ Product automaton visualization saved to output/testing_product_automaton_2robots.dot\n";
+            }
+            // Test OptimalAcceptingPath algorithm
+            std::cout << "  Testing OptimalAcceptingPath... ";
+            std::tuple<std::vector<uint16_t>, uint32_t> result = productAutomaton.OptimalAcceptingPath();
+            std::vector<uint16_t> path = std::get<0>(result);
             
-                if (!path.empty()) {
-                    std::cout << "✓ Found path of length " << path.size() << ": ";
-                    
-                    // Print first few states
-                    for (size_t i = 0; i < std::min(size_t(5), path.size()); i++) {
-                        std::cout << path[i];
-                        if (i < std::min(size_t(4), path.size() - 1)) std::cout << " → ";
-                    }
-                    if (path.size() > 5) std::cout << " → ...";
-                    
-                    // Verify path visits accepting states
-                    const auto& accepting = productAutomaton.getAcceptingStates();
-                    bool visitsAccepting = false;
-                    for (uint16_t state : path) {
-                        if (std::find(accepting.begin(), accepting.end(), state) != accepting.end()) {
-                            visitsAccepting = true;
-                            break;
-                        }
-                    }
-                    if (numRobots == 4) {
-                        std::cout << "  Note: Testing with 4 robots." << std::endl;
-                        // Create TaskAllocationAlgorithms
-                        TaskAllocationAlgorithms* allocAlg = new TaskAllocationAlgorithms(buchi, env, mrs2);
-                        
-                        //build the planning decision tree
-                        allocAlg->intensiveInterTaskRelationshipTreeSearch(buchi, env, mrs2);
-                        //add the full product automaton metrics to the algorithm metrics
-                        allocAlg->getMetrics().setFullProductAutomatonMetrics(
-                            productAutomaton.getNumStates(),
-                            productAutomaton.getNumEdges(),
-                            std::get<1>(result),
-                            1000,
-                            10
-                        );
-                        allocAlg->getMetrics().computeDerivedMetrics();
-                        allocAlg->getMetrics().printSummary();
-                        delete allocAlg;
-                    }
-                    if (visitsAccepting) {
-                        std::cout << " ✓ (Total weight: " << std::get<1>(result) << ")" << std::endl;
-                    } else {
-                        std::cout << " (WARNING: no accepting state in path)" << std::endl;
-                    }
-                } else {
-                    std::cout << "✗ No accepting path found" << std::endl;
+            if (!path.empty()) {
+                std::cout << "✓ Found path of length " << path.size() << ": ";
+                
+                // Print first few states
+                for (size_t i = 0; i < std::min(size_t(5), path.size()); i++) {
+                    std::cout << path[i];
+                    if (i < std::min(size_t(4), path.size() - 1)) std::cout << " → ";
                 }
-        }
+                if (path.size() > 5) std::cout << " → ...";
+                
+                // Verify path visits accepting states
+                const auto& accepting = productAutomaton.getAcceptingStates();
+                bool visitsAccepting = false;
+                for (uint16_t state : path) {
+                    if (std::find(accepting.begin(), accepting.end(), state) != accepting.end()) {
+                        visitsAccepting = true;
+                        break;
+                    }
+                }
+                if (numRobots == 4) {
+                    std::cout << "  Note: Testing with 4 robots." << std::endl;
+                    // Create TaskAllocationAlgorithms
+                    TaskAllocationAlgorithms* allocAlg = new TaskAllocationAlgorithms(buchi, env, mrs2);
+                    
+                    //build the planning decision tree
+                    allocAlg->intensiveInterTaskRelationshipTreeSearch(buchi, env, mrs2);
+                    allocAlg->visualizeTree("planning_decision_tree.png");
+                    allocAlg->visualizeOptimalPath("optimal_path.png");
+                    //add the full product automaton metrics to the algorithm metrics
+                    allocAlg->getMetrics().setFullProductAutomatonMetrics(
+                        productAutomaton.getNumStates(),
+                        productAutomaton.getNumEdges(),
+                        std::get<1>(result),
+                        1000,
+                        10
+                    );
+                    allocAlg->getMetrics().computeDerivedMetrics();
+                    allocAlg->getMetrics().printSummary();
+                    delete allocAlg;
+                }
+                if (visitsAccepting) {
+                    std::cout << " ✓ (Total weight: " << std::get<1>(result) << ")" << std::endl;
+                } else {
+                    std::cout << " (WARNING: no accepting state in path)" << std::endl;
+                }
+            } else {
+                std::cout << "✗ No accepting path found" << std::endl;
+            }
         }
         
         csvFile.close();
