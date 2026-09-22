@@ -4,19 +4,19 @@ digraph PlanningTree {
   edge [fontname=Arial, fontsize=9];
 
   node_0 [label="Node 0\nNBA: 0, TS: 0\nProgress: PRE\nMax Time: 0\nBatch: 0\nRobots: [0,0,0,0]", fillcolor="#FFE6E6"];
-  node_1 [label="Node 1\nNBA: 2, TS: 3\nProgress: PRE\nMax Time: 125\nBatch: 0\nRobots: [1,0,1,0]", fillcolor="#FFE6E6"];
-  node_2 [label="Node 2\nNBA: 3, TS: 2\nProgress: PRE\nMax Time: 125\nBatch: 0\nRobots: [0,1,0,1]", fillcolor="#FFE6E6"];
-  node_3 [label="Node 3\nNBA: 0, TS: 1\nProgress: TRA\nMax Time: 208\nBatch: 0\nRobots: [0,0,0,1]", fillcolor="#FFFFCC"];
-  node_4 [label="Node 4\nNBA: 2, TS: 3\nProgress: TRA\nMax Time: 208\nBatch: 0\nRobots: [1,0,1,0]", fillcolor="#FFFFCC"];
-  node_5 [label="Node 5\nNBA: 3, TS: 2\nProgress: TRA\nMax Time: 285\nBatch: 0\nRobots: [1,1,0,0]", fillcolor="#FFFFCC"];
-  node_6 [label="Node 6\nNBA: 0, TS: 1\nProgress: SUF\nMax Time: 368\nBatch: 0\nRobots: [0,0,0,1]", fillcolor="#E6F3FF"];
-  node_7 [label="Node 7\nNBA: 2, TS: 3\nProgress: OTH\nMax Time: 368\nBatch: 0\nRobots: [1,0,1,0]", fillcolor="#FF6B6B", penwidth=3, color=red];
+  node_1 [label="Node 1\nNBA: 2, TS: 3\nProgress: PRE\nMax Time: 172\nBatch: 0\nRobots: [1,0,1,0]", fillcolor="#FFE6E6"];
+  node_2 [label="Node 2\nNBA: 3, TS: 2\nProgress: PRE\nMax Time: 172\nBatch: 0\nRobots: [0,1,0,1]", fillcolor="#FFE6E6"];
+  node_3 [label="Node 3\nNBA: 0, TS: 1\nProgress: TRA\nMax Time: 172\nBatch: 0\nRobots: [0,0,0,1]", fillcolor="#FFFFCC"];
+  node_4 [label="Node 4\nNBA: 2, TS: 3\nProgress: TRA\nMax Time: 173\nBatch: 0\nRobots: [1,0,1,0]", fillcolor="#FFFFCC"];
+  node_5 [label="Node 5\nNBA: 3, TS: 2\nProgress: TRA\nMax Time: 253\nBatch: 0\nRobots: [0,1,0,1]", fillcolor="#FFFFCC"];
+  node_6 [label="Node 6\nNBA: 0, TS: 1\nProgress: SUF\nMax Time: 308\nBatch: 0\nRobots: [1,0,0,0]", fillcolor="#E6F3FF"];
+  node_7 [label="Node 7\nNBA: 2, TS: 3\nProgress: OTH\nMax Time: 356\nBatch: 0\nRobots: [0,0,1,1]", fillcolor="#FF6B6B", penwidth=3, color=red];
 
-  node_0 -> node_1 [label="cost=125"];
-  node_1 -> node_2 [label="cost=125"];
-  node_2 -> node_3 [label="cost=208"];
-  node_3 -> node_4 [label="cost=208"];
-  node_4 -> node_5 [label="cost=285"];
-  node_5 -> node_6 [label="cost=368"];
-  node_6 -> node_7 [label="cost=368"];
+  node_0 -> node_1 [label="cost=172"];
+  node_1 -> node_2 [label="cost=172"];
+  node_2 -> node_3 [label="cost=172"];
+  node_3 -> node_4 [label="cost=173"];
+  node_4 -> node_5 [label="cost=253"];
+  node_5 -> node_6 [label="cost=308"];
+  node_6 -> node_7 [label="cost=356"];
 }
