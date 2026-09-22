@@ -10,6 +10,20 @@ import os
 import glob
 import csv
 
+# Helper function to filter product makespans
+def filter_product_makespans(product_makespans, makespans, threshold=2.0):
+    """
+    Filter product makespans to only plot values that are <= threshold * tree makespan
+    Returns a list with invalid values replaced with None (matplotlib will skip them)
+    """
+    filtered = []
+    for pm, tm in zip(product_makespans, makespans):
+        if pm > 0 and tm > 0 and pm > threshold * tm:
+            filtered.append(None)  # Skip astronomical values
+        else:
+            filtered.append(pm)
+    return filtered
+
 # Create Plots directory if it doesn't exist
 os.makedirs('Plots', exist_ok=True)
 
@@ -101,9 +115,10 @@ for automaton_id in sorted(automaton_data.keys()):
              linewidth=2.5, color=colors[automaton_id-1], 
              label=f'Automaton {automaton_id} (Task Allocation)')
     
-    # Add product makespan overlay if non-zero values exist
-    if any(pm > 0 for pm in data['product_makespans']):
-        ax2.plot(data['robot_counts'], data['product_makespans'], 
+    # Add product makespan overlay if non-zero values exist (only if within 2x tree makespan)
+    filtered_product_makespans = filter_product_makespans(data['product_makespans'], data['makespans'])
+    if any(pm is not None and pm > 0 for pm in filtered_product_makespans):
+        ax2.plot(data['robot_counts'], filtered_product_makespans, 
                 marker=markers[automaton_id-1], markersize=6, 
                 linewidth=2.5, color=colors[automaton_id-1], linestyle='--',
                 label=f'Automaton {automaton_id} (Product)')
@@ -163,9 +178,10 @@ for automaton_id in sorted(automaton_data.keys()):
                 linewidth=2.5, color=colors[automaton_id-1], 
                 label='Task Allocation Makespan')
         
-        # Add product makespan overlay if non-zero values exist
-        if any(pm > 0 for pm in data['product_makespans']):
-            ax.plot(data['robot_counts'], data['product_makespans'], 
+        # Add product makespan overlay if non-zero values exist (only if within 2x tree makespan)
+        filtered_product_makespans = filter_product_makespans(data['product_makespans'], data['makespans'])
+        if any(pm is not None and pm > 0 for pm in filtered_product_makespans):
+            ax.plot(data['robot_counts'], filtered_product_makespans, 
                     marker='D', markersize=8, 
                     linewidth=2.5, color='#d62728', linestyle='--',
                     label='Product Automaton Makespan')
