@@ -30,7 +30,27 @@ Robotics_Research/
 Learning_Spot/
 raylib/
 
--
 # Data files (uncomment if you don't want to track these)
 # *.dat
 # *.labels
+
+# Generated outputs - exclude large files
+*.dot
+*.csv
+*.png
+*.gp
+
+# Output directories (CRITICAL - exclude all output files)
+output/
+Plots/
+data/
+*/output/
+*/Plots/
+*/data/
+
+# Large DOT files (graphviz) - ensure recursively excluded
+**/*.dot
+Automatons/output/
+organizedtests/*/output/
+organizedtests/*/data/
+organizedtests/*/Plots/
