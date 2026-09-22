@@ -1,0 +1,5 @@
+num_robots,product_states,product_edges,accepting_states,state_ratio
+1,17,14,2,11.7647
+2,87,421,12,13.7931
+3,467,11144,92,19.7002
+4,2547,483440,672,26.384

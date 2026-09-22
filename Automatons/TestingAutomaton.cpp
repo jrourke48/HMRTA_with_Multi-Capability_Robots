@@ -80,22 +80,22 @@ int main()
         MultiRobotSystem* mrs1 = new MultiRobotSystem();
     
         // Position 6 robots in a 3x2 grid, directly adjacent (1-unit spacing)
-        // Grid starts at (160, 80) in room 0
+        // Grid starts at (180, 140) in room 0
         for (int i = 0; i < 6; i++) {
             int col = (i) % 3;  // 0-2 horizontal
             int row = (i) / 3;  // 0-4 vertical
-            int x = 160 + col;
-            int y = 80 + row;
+            int x = 180 + col;
+            int y = 140 + row;
             
              //Rotate capabilities: GPS, MOVEMENT_GROUND, SENSOR_CAMERA
              RobotCapability cap = (i % 3 == 0) ?   RobotCapability::MOVEMENT_GROUND: 
                                  (i % 3 == 1) ? RobotCapability::SENSOR_CAMERA: 
                                  RobotCapability::SENSOR_GPS;
             
-            Robot* r = new Robot(i, "Rover_" + std::to_string(i), Point(x, y));
+            Robot* r = new Robot(i+1, "Rover_" + std::to_string(i+1), Point(x, y));
             r->initializeCapabilities(13);
             r->enableCapability(cap);
-            std::cout << "Robot " << i << " initialized with capability " << capabilityToString(cap) << std::endl;
+            std::cout << "Robot " << i+1 << " initialized with capability " << capabilityToString(cap) << std::endl;
             mrs1->addRobot(r);
         }
         // Allocate Environment
@@ -123,7 +123,7 @@ int main()
         std::cout << "✓ Added " << numObstacles << " random obstacles" << std::endl;
         
         // Create LTL formula (same for all iterations)
-        std::string ltl_str = "(G(F(\"p1\")) & G(F(\"p2\")) & G(F(\"p3\")))";
+        std::string ltl_str = "(G(F(\"p1\")) & G(F(\"p2\")) & G(F\"p3\"))";
         std::vector<BatchAtomicProposition> batchAPs;
         batchAPs.push_back(BatchAtomicProposition(1, 1, {true, false, false, false, false, false, false, false, false, false, false, false, false}, 0));
         batchAPs.push_back(BatchAtomicProposition(2, 2, {true, false, false, true, false, false, false, false, false, false, false, false, false}, 0));
@@ -162,11 +162,11 @@ int main()
         // dotFile.close();
         // std::cout << "✓ Product automaton visualization saved to output/testing_product_automaton.dot\n" << std::endl;
 
-        for (int numRobots = 1; numRobots <= 6; numRobots++) {
+        for (int numRobots = 1; numRobots <= 4; numRobots++) {
             std::cout << "Test " << numRobots << ": Creating " << numRobots << " robot(s)... ";
             std::cout.flush();
             
-            Robot* robot = mrs1->getRobot(numRobots-1);
+            Robot* robot = mrs1->getRobot(numRobots);
             mrs2->addRobot(robot);
 
           

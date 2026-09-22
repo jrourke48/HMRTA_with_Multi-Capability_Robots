@@ -21,6 +21,7 @@ private:
     std::map<uint16_t, std::string> stateMapping;  // Maps product state ID to its label
     std::vector<uint16_t> acceptingStates;  // Set of accepting states
     spot::twa_graph_ptr spotAutomaton;  // Pointer to the underlying Spot automaton
+    const BuchiAutomaton* buchiPtr = nullptr;  // Store pointer to Buchi automaton for later use
     const Environment* envPtr = nullptr;  // Store pointer to Environment for later use
     const MultiRobotSystem* mrsPtr = nullptr;  // Store pointer to MultiRobotSystem for later use
     
@@ -63,6 +64,8 @@ public:
     // Getter for Spot automaton
     spot::twa_graph_ptr getSpotAutomaton() const { return spotAutomaton; }
     uint32_t getEdgeWeight(Node* srcNode, Node* dstNode) const;
+    // Getter for Buchi automaton
+    const BuchiAutomaton* getBuchiAutomaton() const { return buchiPtr; }
 };
 
 #endif

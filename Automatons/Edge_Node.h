@@ -137,6 +137,7 @@ public:
         void setLabel(const std::string& label) { this->label = label; };
         uint16_t getidfromlabel() const { return static_cast<uint16_t>(std::stoul(label.substr(4))); }; //convert label to id if label is numeric
         std::vector<Edge> getEdges() const { return edges; };
+        uint32_t getNumEdges() const { return numEdges; };
         //get the product states for this node
         std::pair<uint16_t, std::vector<uint16_t>> getProductStates() const { return productStates; };
         void setProductStates(const std::string& label) {
@@ -186,6 +187,15 @@ public:
         result += ")]";
         return result;
     };
+    std::vector<Edge> getEdgestoNode(uint16_t dstId) const { 
+        std::vector<Edge> result;
+        for (const Edge& edge : edges) {
+            if (edge.getDstId() == dstId) {
+                result.push_back(edge);
+            }
+        }
+        return result;
+    }; //get all edges to a specific destination node ID
 
 };
 

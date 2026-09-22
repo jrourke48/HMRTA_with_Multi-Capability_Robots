@@ -35,9 +35,10 @@ ProductAutomaton::ProductAutomaton(spot::twa_graph_ptr spotAutomaton) {
  * This constructor builds the synchronized product of the TS for each robot and the Buchi automaton.
  */
 ProductAutomaton::ProductAutomaton(const Environment& env, const MultiRobotSystem& mrs, const BuchiAutomaton& buchiAutomaton) {
-    // Store pointers to env and mrs for later use
+    // Store pointers to env, mrs, and Buchi automaton for later use
     envPtr = &env;
     mrsPtr = &mrs;
+    buchiPtr = &buchiAutomaton;
     
     // Initialize product automaton based on the individual components
     // This is a placeholder implementation and should be replaced with actual logic
@@ -64,27 +65,7 @@ ProductAutomaton::ProductAutomaton(const Environment& env, const MultiRobotSyste
         // Create a copy of the TS for this robot
         TS ts_r = TS(ts);
         
-        // Check each batch AP and remove incompatible nodes
-        for (size_t i = 0; i < batchAPs.size(); ++i) {
-            BatchAtomicProposition batchAP = batchAPs[i];
-            std::vector<bool> Reqcapabilities = batchAP.getCapabilities();
-            std::vector<bool> robotCapabilities = mrs.getRobotCapabilities(r);
-            
-            // Check if there are any matching capabilities
-            bool hasMatchingCapability = false;
-            for (size_t j = 0; j < Reqcapabilities.size() && j < robotCapabilities.size(); ++j) {
-                if (Reqcapabilities[j] && robotCapabilities[j]) {
-                    hasMatchingCapability = true;
-                    break;
-                } 
-            }
-            uint16_t AP = batchAP.getAP();
-            if (!hasMatchingCapability && AP != 0) {
-                ts_r.removeNode(AP);
-            }
-        }
-        
-        // Collect remaining state IDs for this robot
+        // Collect all state IDs for this robot (no pruning - infeasible edges filtered during parseProductFromDot)
         std::vector<uint16_t> remainingStates;
         for (const auto& nodePair : ts_r.getNodes()) {
             remainingStates.push_back(nodePair.first);
@@ -497,7 +478,14 @@ void ProductAutomaton::parseProductFromDot(const std::string& dotContent) {
             // Skip initial edge (I -> state)
             if (src == UINT_MAX) continue;
             
-            edges[src].push_back(std::make_pair(dst, ""));
+            // Extract edge label
+            size_t bracket_end = line.find(']', bracket_start);
+            if (bracket_end == std::string::npos) bracket_end = line.length();
+            
+            std::string bracket_content = line.substr(bracket_start + 1, bracket_end - bracket_start - 1);
+            std::string edgeLabel = extractLabelFromDotBrackets(bracket_content);
+            
+            edges[src].push_back(std::make_pair(dst, edgeLabel));
         }
     }
     
@@ -512,16 +500,64 @@ void ProductAutomaton::parseProductFromDot(const std::string& dotContent) {
         if (srcNode != nullptr) {
             for (const auto& dstLabelPair : srcEntry.second) {
                 unsigned dst = dstLabelPair.first;
-                
+                const std::string& edgeLabel = dstLabelPair.second;
                 if (dst <= UINT16_MAX) {
                     Node* dstNode = getNode(static_cast<uint16_t>(dst));
                     if (dstNode != nullptr) {
-                        uint32_t wght = getEdgeWeight(srcNode, dstNode);
-                        // Only add edge if weight is positive
-                        if (wght > 0) {
-                            Edge edge_obj(static_cast<uint16_t>(dst), wght);
+                        // Create edge object with trueAPs set to true
+                        Edge edge_obj(static_cast<uint16_t>(dst), edgeLabel, true);
+                        // Get the true atomic propositions for this edge. 
+                        //the inner vectors represent conjunctions (AND) of APs that must all be satisfied.
+                        // the outer vector represents disjunctions (OR) of these conjunctions
+                        std::vector<std::vector<uint16_t>> trueAPs = edge_obj.getTrueAPs();
+                        // Retrieve destination product states
+                        std::vector<uint16_t> dstProductStates = dstNode->getProductStates().second;
+                        //need to make sure the destination product states satisfy the trueAPs
+                        // trueAPs is a disjunction (OR) of conjunctions (AND)
+                        // At least one conjunction must be fully satisfied
+                        bool satisfiesTrueAPs = false;
+                        for (const auto& apSet : trueAPs) {
+                            // For this conjunction, count how many APs are satisfied
+                            int numSatisfied = 0;
+                            for (uint16_t ap : apSet) {
+                                std::vector<bool> requiredCapabilities = buchiPtr->getLTLFormula()->getRequiredCapabilities(ap);
+                                // Collect capabilities from all robots at this AP location
+                                std::vector<bool> teamCapabilities(requiredCapabilities.size(), false);
+                                uint8_t robotIdx = 1;
+                                for (uint16_t robotstate : dstProductStates) {
+                                    if (robotstate == ap) {
+                                        std::vector<bool> roboCaps = mrsPtr->getRobotCapabilities(robotIdx);
+                                        // OR the capabilities together element-wise
+                                        for (size_t j = 0; j < teamCapabilities.size() && j < roboCaps.size(); ++j) {
+                                            teamCapabilities[j] = teamCapabilities[j] || roboCaps[j];
+                                        }
+                                    }
+                                    robotIdx++;
+                                }
+                                // Check if team capabilities satisfy required capabilities (superset)
+                                bool satisfiesRequired = true;
+                                for (size_t j = 0; j < requiredCapabilities.size(); ++j) {
+                                    if (requiredCapabilities[j] && !teamCapabilities[j]) {
+                                        satisfiesRequired = false;
+                                        break;
+                                    }
+                                }
+                                if (satisfiesRequired) {
+                                    numSatisfied++;
+                                }
+                            }
+                            // If all APs in this conjunction are satisfied, this conjunction is true
+                            if (numSatisfied == static_cast<int>(apSet.size())) {
+                                satisfiesTrueAPs = true;
+                                break;  // Found one satisfied conjunction, can add the edge
+                            }
+                        }
+                        if (satisfiesTrueAPs) {
+                            //set the weight for the edge object
+                            edge_obj.setWeight(getEdgeWeight(srcNode, dstNode));
                             srcNode->addEdge(edge_obj);
                             numEdges++;
+                            
                         }
                     }
                 }
@@ -817,7 +853,7 @@ uint32_t ProductAutomaton::getEdgeWeight(Node* srcNode, Node* dstNode) const {
                     continue;
                 }
                 
-                auto robot = mrsPtr->getRobot(i);
+                auto robot = mrsPtr->getRobot(i + 1);
                 if (robot == nullptr) {
                     std::cerr << "ERROR: getRobot returned nullptr for robot " << i << std::endl;
                     continue;
