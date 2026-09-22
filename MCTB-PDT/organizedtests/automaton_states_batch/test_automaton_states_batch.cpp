@@ -617,12 +617,12 @@ void createTestEnvironment15(TS*& ts, GridWorld*& grid, Environment*& env, Multi
     mrs = new MultiRobotSystem();
     
     // Position 15 robots in a 3x5 grid, directly adjacent (1-unit spacing)
-    // Grid starts at (140, 120) in room 0
+    // Grid starts at (180, 140) in room 0
     for (int i = 1; i <= 15; i++) {
         int col = (i - 1) % 3;  // 0-2 horizontal
         int row = (i - 1) / 3;  // 0-4 vertical
-        int x = 140 + col;
-        int y = 120 + row;
+        int x = 180 + col;
+        int y = 140 + row;
         
         // Rotate capabilities: GPS, MOVEMENT_GROUND, SENSOR_CAMERA
         RobotCapability cap = (i % 3 == 1) ? RobotCapability::SENSOR_GPS : 
@@ -699,12 +699,12 @@ void createTestEnvironment45(TS*& ts, GridWorld*& grid, Environment*& env, Multi
     mrs = new MultiRobotSystem();
     
     // Position 45 robots in a 9x5 grid, all in room 0
-    // Grid starts at (135, 120), directly adjacent (1-unit spacing)
+    // Grid starts at (180, 140), directly adjacent (1-unit spacing)
     for (int i = 1; i <= 45; i++) {
         int col = (i - 1) % 9;  // 0-8 horizontal
         int row = (i - 1) / 9;  // 0-4 vertical
-        int x = 135 + col;
-        int y = 120 + row;
+        int x = 180 + col;
+        int y = 140 + row;
         
         // Rotate capabilities: GPS, MOVEMENT_GROUND, SENSOR_CAMERA
         RobotCapability cap = (i % 3 == 1) ? RobotCapability::SENSOR_GPS : 

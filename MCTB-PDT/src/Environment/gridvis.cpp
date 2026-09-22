@@ -376,7 +376,7 @@ void visualize_environment(
             DrawCircleLines(centerX, centerY, radius + 2, BLACK);
 
             // Draw robot ID
-            std::string robotLabel = mrs.getRobot(i)->getName();
+            std::string robotLabel = mrs.getRobot(i + 1)->getName();
             DrawText(robotLabel.c_str(), centerX - 8, centerY - 8, 14, WHITE);
         }
 

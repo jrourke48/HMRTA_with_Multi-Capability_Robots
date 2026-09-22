@@ -67,8 +67,13 @@ int main() {
         createTestInfiniteBuchiAutomaton6
     };
     
-    vector<double> homogeneityValues = {0.2, 0.6, 1, 1.4, 1.8, 2.2, 2.6, 3};
     vector<int> robotCounts = {6, 10, 16};
+    // Dynamic homogeneity ranges based on robot count: max = 12 / robotCount
+    map<int, vector<double>> homogeneityRanges = {
+        {6, {0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0}},     // 6 robots: 0.4-2.0
+        {10, {0.2, 0.4, 0.6, 0.8, 1.0, 1.2}},                    // 10 robots: 0.2-1.2
+        {16, {0.125, 0.25, 0.375, 0.5, 0.625, 0.75}}            // 16 robots: 0.125-0.75
+    };
     int testNum = 1;
     
     // Run tests: automatonId outer, robotCount middle, homogeneity inner
@@ -83,8 +88,8 @@ int main() {
         cout << "   RUNNING TESTS (robot_homogeneity varying)" << endl;
         cout << string(80, '-') << "\n" << endl;
         
-        // For each of the 8 robot homogeneity values
-        for (double homogeneity : homogeneityValues) {
+        // For each robot count's dynamic homogeneity range
+        for (double homogeneity : homogeneityRanges[robotCount]) {
             // Create test environment for this configuration
             TS* ts = nullptr;
             GridWorld* grid = nullptr;
@@ -226,17 +231,17 @@ int main() {
 // REMOVED: createTestInfiniteBuchiAutomaton1 (originally test 1)
 
 /**
- * Test 2: Nested Next Operators with Sequencing → RENAMED TO 1
- * Combines infinitely-often with chained next operators
- * Complexity: 4 APs, 6 Automaton States
- * G(F("p0" & X("p1" & X"p2"))) & G(F("p3"))
+ * Test 1: Simple Dual Properties → Requires 2-3 independent capabilities
+ * G(F("p0")) & G(F("p1")) - 2 properties, 2 APs
  */
 BuchiAutomaton* createTestInfiniteBuchiAutomaton1() {
-    string ltl_str = "(G(F(\"p0\")) & G(F(\"p2\")))";
+    string ltl_str = "(G(F(\"p0\")) & G(F(\"p1\")))";
     
     vector<BatchAtomicProposition> batchAPs;
-    batchAPs.push_back(BatchAtomicProposition(0, 0, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(2, 2, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
+    // p0: uses capabilities 0, 1 (2 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(0, 0, {true, true, false, false, false, false, false, false, false, false, false, false}, 0));
+    // p1: uses capabilities 0, 2, 3 (3 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(1, 1, {true, false, true, true, false, false, false, false, false, false, false, false}, 0));
     
     LTLFormula* ltlFormula = new LTLFormula(ltl_str, batchAPs);
     BuchiAutomaton* buchi = new BuchiAutomaton(ltlFormula);
@@ -248,19 +253,21 @@ BuchiAutomaton* createTestInfiniteBuchiAutomaton1() {
 // REMOVED: createTestInfiniteBuchiAutomaton2 placeholder (now createTestInfiniteBuchiAutomaton1)
 
 /**
- * Test 3: Mixed Next and Until Operators → RENAMED TO 2
- * Combines infinitely-often with until (weak until) patterns
- * Complexity: 5 APs, 10 Automaton States
- * G(F("p0")) & G(F("p1" & X("p2"))) & G(F(!"p3" U "p4") & G(F("p3")))
+ * Test 2: Three Properties with Sequencing → Requires 3-4 independent capabilities
+ * G(F("p0")) & G(F("p1" & X("p2"))) - 3 properties, 4 APs
  */
 BuchiAutomaton* createTestInfiniteBuchiAutomaton2() {
     string ltl_str = "G(F(\"p0\" & X(\"p1\" & X\"p2\"))) & G(F(\"p3\"))";
     
     vector<BatchAtomicProposition> batchAPs;
-    batchAPs.push_back(BatchAtomicProposition(0, 0, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(1, 1, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(2, 2, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(3, 3, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
+    // p0: uses capabilities 0, 1, 2 (3 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(0, 0, {true, true, true, false, false, false, false, false, false, false, false, false}, 0));
+    // p1: uses capabilities 1, 2 (2 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(1, 1, {false, true, true, false, false, false, false, false, false, false, false, false}, 0));
+    // p2: uses capabilities 3, 4 (2 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(2, 2, {false, false, false, true, true, false, false, false, false, false, false, false}, 0));
+    // p3: uses capabilities 2, 3, 5 (3 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(3, 3, {false, false, true, true, false, true, false, false, false, false, false, false}, 0));
 
     LTLFormula* ltlFormula = new LTLFormula(ltl_str, batchAPs);
     BuchiAutomaton* buchi = new BuchiAutomaton(ltlFormula);
@@ -271,20 +278,23 @@ BuchiAutomaton* createTestInfiniteBuchiAutomaton2() {
 // This was moved to createTestInfiniteBuchiAutomaton2
 
 /**
- * Test 4: Until with Disjunctive Branching → RENAMED TO 3
- * Introduces disjunction at top level with complex nested structure
- * Complexity: 5 APs, 16 Automaton States
- * G((F("p0" & X(!"p1" U "p2")))) & G(F("p1")) & (G(F("p3")) | G(F("p4" & X("p0"))))
+ * Test 3: Five Properties with Mixed Operators → Requires 4-6 independent capabilities
+ * G(F("p0")) & G(F("p1" & X("p2"))) & G(F("p3")) & G(F("p4")) - 5 properties
  */
 BuchiAutomaton* createTestInfiniteBuchiAutomaton3() {
-    string ltl_str = "(G(F(\"p0\")) & G(F(\"p1\" & X(\"p2\"))) & G(F(!\"p3\" U \"p4\") & G(F(\"p3\"))))";
+    string ltl_str = "(G(F(\"p0\")) & G(F(\"p1\" & X(\"p2\"))) & G(F(\"p3\")) & G(F(\"p4\")))";
     
     vector<BatchAtomicProposition> batchAPs;
-    batchAPs.push_back(BatchAtomicProposition(0, 0, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(1, 1, {true, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(2, 2, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(3, 3, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(4, 4, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    // p0: uses capabilities 0, 1, 2 (3 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(0, 0, {true, true, true, false, false, false, false, false, false, false, false, false}, 0));
+    // p1: uses capabilities 0, 2, 3, 4 (4 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(1, 1, {true, false, true, true, true, false, false, false, false, false, false, false}, 0));
+    // p2: uses capabilities 1, 3, 5 (3 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(2, 2, {false, true, false, true, false, true, false, false, false, false, false, false}, 0));
+    // p3: uses capabilities 0, 2, 4 (3 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(3, 3, {true, false, true, false, true, false, false, false, false, false, false, false}, 0));
+    // p4: uses capabilities 1, 2, 3, 5 (4 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(4, 4, {false, true, true, true, false, true, false, false, false, false, false, false}, 0));
     
     LTLFormula* ltlFormula = new LTLFormula(ltl_str, batchAPs);
     BuchiAutomaton* buchi = new BuchiAutomaton(ltlFormula);
@@ -295,20 +305,27 @@ BuchiAutomaton* createTestInfiniteBuchiAutomaton3() {
 // REMOVED: createTestInfiniteBuchiAutomaton4 placeholder (now createTestInfiniteBuchiAutomaton3)
 
 /**
- * Test 5: Multiple Sequential Until Conditions → RENAMED TO 4
- * Deep nesting of until operators with complex boolean combinations
- * Complexity: 10 APs, 20 Automaton States
- * G((F(!"p0" U ("p1" & F("p2"))) & G(F("p0")) & G(F("p3")) & F(!"p3" U ("p4" & F("p5"))) & F("p3") & F("p6" & X("p7")) & G(F("p8")) & G(F(!"p8" U "p9"))))
+ * Test 4: Seven Properties with Sequential Conditions → Requires 6-8 independent capabilities
+ * Complex formula with multiple temporal constraints
  */
 BuchiAutomaton* createTestInfiniteBuchiAutomaton4() {
-    string ltl_str = "G((F(\"p0\" & X(!\"p1\" U \"p2\")))) & G(F(\"p1\")) & (G(F(\"p3\")) | G(F(\"p4\" & X(\"p0\"))))";
+    string ltl_str = "G((F(\"p0\" & X(!\"p1\" U \"p2\")))) & G(F(\"p3\")) & G(F(\"p4\")) & G(F(\"p5\")) & G(F(\"p6\"))";
     
     vector<BatchAtomicProposition> batchAPs;
-    batchAPs.push_back(BatchAtomicProposition(0, 0, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(1, 1, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(2, 2, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(3, 3, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(4, 4, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
+    // p0: uses capabilities 0, 1, 2, 3 (4 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(0, 0, {true, true, true, true, false, false, false, false, false, false, false, false}, 0));
+    // p1: uses capabilities 0, 2, 5 (3 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(1, 1, {true, false, true, false, false, true, false, false, false, false, false, false}, 0));
+    // p2: uses capabilities 1, 2, 4, 5 (4 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(2, 2, {false, true, true, false, true, true, false, false, false, false, false, false}, 0));
+    // p3: uses capabilities 0, 1, 3 (3 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(3, 3, {true, true, false, true, false, false, false, false, false, false, false, false}, 0));
+    // p4: uses capabilities 2, 3, 4 (3 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(4, 4, {false, false, true, true, true, false, false, false, false, false, false, false}, 0));
+    // p5: uses capabilities 0, 4, 6, 7 (4 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(5, 5, {true, false, false, false, true, false, true, true, false, false, false, false}, 0));
+    // p6: uses capabilities 1, 2, 5, 6 (4 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(6, 2, {false, true, true, false, false, true, true, false, false, false, false, false}, 0));
 
     LTLFormula* ltlFormula = new LTLFormula(ltl_str, batchAPs);
     BuchiAutomaton* buchi = new BuchiAutomaton(ltlFormula);
@@ -319,25 +336,34 @@ BuchiAutomaton* createTestInfiniteBuchiAutomaton4() {
 // This was moved to createTestInfiniteBuchiAutomaton4
 
 /**
- * Test 7: Extended Formula with Infinitely-Often and Next Operators → RENAMED TO 5
- * Enhances Test 6 pattern with additional temporal constraints (p8, p9)
- * Complexity: 10 APs, 27 Automaton States
- * G((F("p0" & X(!"p1" U "p2")))) & G(F("p1")) & (G(F("p3")) & G(F("p5")) & G(F(("p8") & X("p9")))) | G(F("p4" & X("p0")) & G(F("p6" & X("p7")))))
+ * Test 5: Ten Properties with Complex Temporal Constraints → Requires 8-10 independent capabilities
+ * Extended formula with until patterns and nested temporal operators (sparse distribution)
  */
 BuchiAutomaton* createTestInfiniteBuchiAutomaton5() {
-    string ltl_str = "(G((F(!\"p0\" U (\"p1\" & F(\"p2\"))) & G(F(\"p0\")) & G(F(\"p3\")) & F(!\"p3\" U (\"p4\" & F(\"p5\"))) & F(\"p3\") & F(\"p6\" & X(\"p7\")) & G(F(\"p8\")) & G(F(!\"p8\" U \"p9\"))))";
+    string ltl_str = "(G((F(!\"p0\" U (\"p1\" & F(\"p2\"))) & G(F(\"p0\")) & G(F(\"p3\")) & F(!\"p3\" U (\"p4\" & F(\"p5\"))) & F(\"p3\") & F(\"p6\" & X(\"p7\")) & G(F(\"p8\")) & G(F(!\"p8\" U \"p9\")))))";
     
     vector<BatchAtomicProposition> batchAPs;
-    for (int i = 0; i < 10; i++) {
-        uint16_t tsState = i % 6;
-        bool hasGPS = (i % 2 == 0);
-        vector<bool> caps(13, false);
-        if (hasGPS) caps[5] = true;
-        if (i % 3 == 1) caps[0] = true;
-        caps[5] = true;  // All have GPS
-        
-        batchAPs.push_back(BatchAtomicProposition(i, tsState, caps, 0));
-    }
+    // 10 propositions using 8-10 capabilities (sparse distribution across caps 0-9)
+    // p0: uses capabilities 0, 1, 2 (3 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(0, 0, {true, true, true, false, false, false, false, false, false, false, false, false}, 0));
+    // p1: uses capabilities 3, 4 (2 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(1, 1, {false, false, false, true, true, false, false, false, false, false, false, false}, 0));
+    // p2: uses capabilities 0, 5, 6 (3 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(2, 2, {true, false, false, false, false, true, true, false, false, false, false, false}, 0));
+    // p3: uses capabilities 1, 3, 7 (3 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(3, 3, {false, true, false, true, false, false, false, true, false, false, false, false}, 0));
+    // p4: uses capabilities 2, 4, 8 (3 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(4, 4, {false, false, true, false, true, false, false, false, true, false, false, false}, 0));
+    // p5: uses capabilities 5, 7, 9 (3 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(5, 5, {false, false, false, false, false, true, false, true, false, true, false, false}, 0));
+    // p6: uses capabilities 0, 3, 6, 8 (4 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(6, 2, {true, false, false, true, false, false, true, false, true, false, false, false}, 0));
+    // p7: uses capabilities 1, 2, 4, 9 (4 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(7, 4, {false, true, true, false, true, false, false, false, false, true, false, false}, 0));
+    // p8: uses capabilities 5, 6, 7 (3 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(8, 3, {false, false, false, false, false, true, true, true, false, false, false, false}, 0));
+    // p9: uses capabilities 0, 2, 3, 4, 8, 9 (6 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(9, 4, {true, false, true, true, true, false, false, false, true, true, false, false}, 0));
     
     LTLFormula* ltlFormula = new LTLFormula(ltl_str, batchAPs);
     BuchiAutomaton* buchi = new BuchiAutomaton(ltlFormula);
@@ -348,24 +374,34 @@ BuchiAutomaton* createTestInfiniteBuchiAutomaton5() {
 // REMOVED: createTestInfiniteBuchiAutomaton6 placeholder (now createTestInfiniteBuchiAutomaton5)
 
 /**
- * Test 8: Standardized High-Complexity Formula (Disjunctive Pattern) → RENAMED TO 6
- * 18 APs, 38 Automaton States, until-based liveness properties, variant of Test 7 with OR instead of AND
- * Complexity: 18 APs, standardized G(F(!pX U pY)) pattern throughout, disjunctive top-level
+ * Test 6: High-Complexity Formula with Disjunctive Patterns → Requires 12 independent capabilities
+ * 10 propositions, complex temporal logic with until patterns and disjunctions (sparse distribution)
  */
 BuchiAutomaton* createTestInfiniteBuchiAutomaton6() {
-    string ltl_str = "G((F(\"p0\" & X(!\"p1\" U \"p2\")))) & G(F(\"p1\")) & (G(F(\"p3\")) & G(F(\"p5\")) & G(F((\"p8\") & X(\"p9\")))) | G(F(\"p4\" & X(\"p0\")) & G(F(\"p6\" & X(\"p7\")))))";
+    string ltl_str = "G((F(\"p0\" & X(!\"p1\" U \"p2\")))) & G(F(\"p1\")) & (G(F(\"p3\")) & G(F(\"p5\")) & G(F((\"p8\") & X(\"p9\")))) | G(F(\"p4\" & X(\"p0\")) & G(F(\"p6\" & X(\"p7\"))))";
     
     vector<BatchAtomicProposition> batchAPs;
-    batchAPs.push_back(BatchAtomicProposition(0, 0, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(1, 1, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(2, 2, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(3, 3, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(4, 4, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(5, 5, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(6, 2, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));  // p6
-    batchAPs.push_back(BatchAtomicProposition(7, 4, {true, false, false, true, false, true, false, false, false, false, false, false, false}, 0));  // p7
-    batchAPs.push_back(BatchAtomicProposition(8, 3, {true, false, false, true, false, true, false, false, false, false, false, false, false}, 0));  // p8
-    batchAPs.push_back(BatchAtomicProposition(9, 4, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));  // p9
+    // 10 propositions using all 12 capabilities from the 12-capability pool (sparse distribution)
+    // p0: uses capabilities 0, 1, 2 (3 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(0, 0, {true, true, true, false, false, false, false, false, false, false, false, false}, 0));
+    // p1: uses capabilities 3, 4, 5 (3 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(1, 1, {false, false, false, true, true, true, false, false, false, false, false, false}, 0));
+    // p2: uses capabilities 0, 6, 7 (3 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(2, 2, {true, false, false, false, false, false, true, true, false, false, false, false}, 0));
+    // p3: uses capabilities 1, 8, 9 (3 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(3, 3, {false, true, false, false, false, false, false, false, true, true, false, false}, 0));
+    // p4: uses capabilities 2, 4, 10 (3 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(4, 4, {false, false, true, false, true, false, false, false, false, false, true, false}, 0));
+    // p5: uses capabilities 3, 5, 11 (3 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(5, 5, {false, false, false, true, false, true, false, false, false, false, false, true}, 0));
+    // p6: uses capabilities 0, 1, 6, 7, 8 (5 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(6, 2, {true, true, false, false, false, false, true, true, true, false, false, false}, 0));
+    // p7: uses capabilities 2, 3, 9, 10 (4 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(7, 4, {false, false, true, true, false, false, false, false, false, true, true, false}, 0));
+    // p8: uses capabilities 4, 5, 11 (3 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(8, 3, {false, false, false, false, true, true, false, false, false, false, false, true}, 0));
+    // p9: uses capabilities 0, 1, 2, 6, 7, 10, 11 (7 capabilities)
+    batchAPs.push_back(BatchAtomicProposition(9, 4, {true, true, true, false, false, false, true, true, false, false, true, true}, 0));
 
     LTLFormula* ltlFormula = new LTLFormula(ltl_str, batchAPs);
     BuchiAutomaton* buchi = new BuchiAutomaton(ltlFormula);
@@ -432,52 +468,53 @@ void createTestEnvironment(TS*& ts, GridWorld*& grid, Environment*& env, MultiRo
     // Create MultiRobotSystem with robots distributed for robot homogeneity
     mrs = new MultiRobotSystem();
     
+    // Available capability types: 12 different robot capabilities
+    vector<RobotCapability> capabilityPool = {
+        RobotCapability::MOVEMENT_GROUND,          // 0
+        RobotCapability::MOVEMENT_AERIAL,          // 1
+        RobotCapability::MOVEMENT_AQUATIC,         // 2
+        RobotCapability::SENSOR_CAMERA,            // 3
+        RobotCapability::SENSOR_LIDAR,             // 4
+        RobotCapability::SENSOR_GPS,               // 5
+        RobotCapability::SENSOR_IMU,               // 6
+        RobotCapability::SENSOR_PROXIMITY,         // 7
+        RobotCapability::MANIPULATION_GRIPPER,     // 8
+        RobotCapability::MANIPULATION_TOOL,        // 9
+        RobotCapability::COMMUNICATION_WIFI,       // 10
+        RobotCapability::COMMUNICATION_4G          // 11
+    };
+    
     // Calculate total independent capabilities needed
     // homogeneity = total_independent_caps / robotCount
     int totalCapabilities = static_cast<int>(round(homogeneity * robotCount));
     
-    // Cap at maximum available capability types (13)
-    totalCapabilities = std::min(totalCapabilities, 13);
+    // Cap at maximum available capability types (12) - but only if it exceeds the pool size
+    // For lower homogeneity values, we use fewer independent capabilities
+    totalCapabilities = std::min(totalCapabilities, static_cast<int>(capabilityPool.size()));
     
-    // Available capability types in order
-    vector<RobotCapability> capabilityPool = {
-        RobotCapability::SENSOR_GPS,
-        RobotCapability::MOVEMENT_GROUND,
-        RobotCapability::SENSOR_CAMERA,
-        RobotCapability::MANIPULATION_GRIPPER,
-        RobotCapability::MANIPULATION_TOOL,
-        RobotCapability::CAPABILITY_PAYLOAD,
-        RobotCapability::SENSOR_GPS,          // Repeat for variety
-        RobotCapability::MOVEMENT_GROUND,
-        RobotCapability::SENSOR_CAMERA,
-        RobotCapability::MANIPULATION_GRIPPER,
-        RobotCapability::MANIPULATION_TOOL,
-        RobotCapability::CAPABILITY_PAYLOAD,
-        RobotCapability::SENSOR_GPS
-    };
-    
-    // Distribute totalCapabilities across robots round-robin (duplicates allowed)
-    int capIdx = 0;
+    // Distribute totalCapabilities across robots: each robot gets at least 1 capability
+    // This ensures no "capless" robots which would violate the homogeneity definition
+    // KEY CHANGE: Use overlapping distribution so robots are more capable
+    // Each robot gets ceil(totalCapabilities * 0.75) capabilities with overlap
     for (int i = 1; i <= robotCount; i++) {
         int col = (i - 1) % 3;  // 0-2 horizontal
         int row = (i - 1) / 3;  // 0-4+ vertical
-        int x = 160 + col;
-        int y = 80 + row;
+        int x = 180 + col;
+        int y = 140 + row;
         
         Robot* r = new Robot(i, "Rover_" + to_string(i), Point(x, y));
         r->initializeCapabilities(13);
         
-        // Calculate how many capabilities this robot gets
-        // Distribute evenly across robots
-        int capsPerRobot = totalCapabilities / robotCount;
-        int remainder = totalCapabilities % robotCount;
-        int capCount = capsPerRobot + (i <= remainder ? 1 : 0);
-        
-        // Assign capabilities round-robin (duplicates across robots allowed)
-        for (int j = 0; j < capCount; j++) {
-            if (totalCapabilities > 0) {
-                r->enableCapability(capabilityPool[capIdx % capabilityPool.size()]);
-                capIdx++;
+        if (totalCapabilities > 0) {
+            // Each robot gets a larger subset of available capabilities (with overlap)
+            // This makes robots more capable while keeping total independent caps the same
+            int capsPerRobot = std::max(2, (totalCapabilities * 3) / 4);  // At least 75% of total
+            capsPerRobot = std::min(capsPerRobot, totalCapabilities);      // Cap at total available
+            
+            // Each robot starts at offset (i-1) and wraps around
+            for (int j = 0; j < capsPerRobot; j++) {
+                int capIdx = (i - 1 + j) % totalCapabilities;
+                r->enableCapability(capabilityPool[capIdx]);
             }
         }
         

@@ -265,33 +265,20 @@ std::string MultiRobotSystem::to_string() const {
 
 
 /**
- * getTotalRobotCapabilities - Get the union of all capabilities across all robots
+ * getTotalRobotCapabilities - Sum of all capabilities across all robots (with duplicates)
  */
 uint16_t MultiRobotSystem::getTotalRobotCapabilities() const {
-    // Create a zero vector of capabilities
-    std::vector<bool> capabilities;
+    uint16_t total = 0;
     
-    // Build it from all robots
+    // Count every capability in every robot
     for (const auto* robot : robots) {
         if (robot) {
             const auto& robotCaps = robot->getCapabilities();
-            if (capabilities.empty()) {
-                // Initialize with the first robot's capabilities
-                capabilities = robotCaps;
-            } else {
-                // OR the capabilities together
-                for (size_t i = 0; i < robotCaps.size() && i < capabilities.size(); ++i) {
-                    capabilities[i] = capabilities[i] || robotCaps[i];
+            for (bool cap : robotCaps) {
+                if (cap) {
+                    total += 1;
                 }
             }
-        }
-    }
-    
-    // Count the total true values
-    uint16_t total = 0;
-    for (bool cap : capabilities) {
-        if (cap) {
-            total += 1;
         }
     }
     return total;

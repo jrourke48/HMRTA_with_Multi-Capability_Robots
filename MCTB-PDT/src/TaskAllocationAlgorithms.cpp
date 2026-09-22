@@ -338,18 +338,14 @@ void TaskAllocationAlgorithms::unrelatedTaskSearch(
     Point taskLocation = environment->TSStateIdToGridCenter(tsStateId);
     
     multiRobotSystem->setRobotPositions(currentNode->getRobotPositions()); // Ensure current node has robot positions stored
-    
     //times to goal for each robot
     std::vector<uint16_t> timesToGoal = multiRobotSystem->updateRobotTimesToGoal(currentNode->getTimes(), taskLocation);
-
     // Get the sort of the times vector and get the corresponding robot indices to find the best robot assignment
     std::vector<std::pair<uint16_t, uint16_t>> sortedTimes = Tree_Node::getSortedTimes(timesToGoal);
-    
     // Get required capabilities from the BatchAtomicProposition using apId (not tsStateId)
-    // CRITICAL: Different APs can map to same TS state but have different required capabilities
     BatchAtomicProposition batchAP = nba->getLTLFormula()->getBatchAP(apId);
     std::vector<bool> requiredCapabilities = batchAP.getCapabilities();
-    
+
     // Find all permutations of robots that satisfy all required capabilities
     const std::vector<Robot*>& allRobots = multiRobotSystem->getRobots();
     
@@ -639,9 +635,9 @@ void TaskAllocationAlgorithms::placeAllocatedRobotsAtAdjacentCells(
             int newX = taskLocation.getX() + adjacentOffsets[offsetIdx].first;
             int newY = taskLocation.getY() + adjacentOffsets[offsetIdx].second;
             
-            // Clamp to valid grid coordinates [0, 20]
-            newX = std::max(0, std::min(newX, 20));
-            newY = std::max(0, std::min(newY, 20));
+            // Clamp to valid grid coordinates [0, gridwidth/height]
+            newX = std::max(0, std::min(newX, (int)environment->getGridWorld()->getWidth() - 1));
+            newY = std::max(0, std::min(newY, (int)environment->getGridWorld()->getHeight() - 1));
             
             updatedPositions[i] = Point(newX, newY);
             robotIndex++;

@@ -10,6 +10,20 @@ import os
 import glob
 import csv
 
+# Helper function to filter product makespans
+def filter_product_makespans(product_makespans, makespans, threshold=2.0):
+    """
+    Filter product makespans to only plot values that are <= threshold * tree makespan
+    Returns a list with invalid values replaced with None (matplotlib will skip them)
+    """
+    filtered = []
+    for pm, tm in zip(product_makespans, makespans):
+        if pm > 0 and tm > 0 and pm > threshold * tm:
+            filtered.append(None)  # Skip astronomical values
+        else:
+            filtered.append(pm)
+    return filtered
+
 # Create Plots directory if it doesn't exist
 os.makedirs('Plots', exist_ok=True)
 
@@ -178,9 +192,10 @@ if any(makespans_3robots):
     ax5.plot(states_3robots, makespans_3robots, marker='o', markersize=8, 
              linewidth=2.5, color='#1f77b4', label='Tree Makespan (Task Allocation)')
     
-    # Add product makespan overlay if non-zero values exist
-    if any(product_makespans_3robots):
-        ax5.plot(states_3robots, product_makespans_3robots, marker='s', markersize=8, 
+    # Add product makespan overlay if non-zero values exist (only if within 2x tree makespan)
+    filtered_product_makespans_3 = filter_product_makespans(product_makespans_3robots, makespans_3robots)
+    if any(pm > 0 for pm in filtered_product_makespans_3):
+        ax5.plot(states_3robots, filtered_product_makespans_3, marker='s', markersize=8, 
                  linewidth=2.5, color='#d62728', linestyle='--', label='Product Automaton Makespan')
     
     ax5.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
@@ -207,9 +222,10 @@ if any(makespans_6robots):
     ax6.plot(states_6robots, makespans_6robots, marker='s', markersize=8, 
              linewidth=2.5, color='#ff7f0e', label='Tree Makespan (Task Allocation)')
     
-    # Add product makespan overlay if non-zero values exist
-    if any(product_makespans_6robots):
-        ax6.plot(states_6robots, product_makespans_6robots, marker='^', markersize=8, 
+    # Add product makespan overlay if non-zero values exist (only if within 2x tree makespan)
+    filtered_product_makespans_6 = filter_product_makespans(product_makespans_6robots, makespans_6robots)
+    if any(pm > 0 for pm in filtered_product_makespans_6):
+        ax6.plot(states_6robots, filtered_product_makespans_6, marker='^', markersize=8, 
                  linewidth=2.5, color='#d62728', linestyle='--', label='Product Automaton Makespan')
     
     ax6.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
@@ -236,9 +252,10 @@ if any(makespans_15robots):
     ax7.plot(states_15robots, makespans_15robots, marker='^', markersize=8, 
              linewidth=2.5, color='#2ca02c', label='Tree Makespan (Task Allocation)')
     
-    # Add product makespan overlay if non-zero values exist
-    if any(product_makespans_15robots):
-        ax7.plot(states_15robots, product_makespans_15robots, marker='D', markersize=8, 
+    # Add product makespan overlay if non-zero values exist (only if within 2x tree makespan)
+    filtered_product_makespans_15 = filter_product_makespans(product_makespans_15robots, makespans_15robots)
+    if any(pm > 0 for pm in filtered_product_makespans_15):
+        ax7.plot(states_15robots, filtered_product_makespans_15, marker='D', markersize=8, 
                  linewidth=2.5, color='#d62728', linestyle='--', label='Product Automaton Makespan')
     
     ax7.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
@@ -265,9 +282,10 @@ if any(makespans_45robots):
     ax8.plot(states_45robots, makespans_45robots, marker='D', markersize=8, 
              linewidth=2.5, color='#d62728', label='Tree Makespan (Task Allocation)')
     
-    # Add product makespan overlay if non-zero values exist
-    if any(product_makespans_45robots):
-        ax8.plot(states_45robots, product_makespans_45robots, marker='*', markersize=12, 
+    # Add product makespan overlay if non-zero values exist (only if within 2x tree makespan)
+    filtered_product_makespans_45 = filter_product_makespans(product_makespans_45robots, makespans_45robots)
+    if any(pm > 0 for pm in filtered_product_makespans_45):
+        ax8.plot(states_45robots, filtered_product_makespans_45, marker='*', markersize=12, 
                  linewidth=2.5, color='#2ca02c', linestyle='--', label='Product Automaton Makespan')
     
     ax8.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
@@ -318,29 +336,33 @@ fig10.suptitle('Automaton Complexity vs Makespan (All Configurations)', fontsize
 if any(makespans_3robots):
     ax10.plot(states_3robots, makespans_3robots, marker='o', markersize=8, 
              linewidth=2.5, color='#1f77b4', label='3-Robot (Task Allocation)')
-if any(product_makespans_3robots):
-    ax10.plot(states_3robots, product_makespans_3robots, marker='o', markersize=6, 
+filtered_product_3_combined = filter_product_makespans(product_makespans_3robots, makespans_3robots)
+if any(pm > 0 for pm in filtered_product_3_combined):
+    ax10.plot(states_3robots, filtered_product_3_combined, marker='o', markersize=6, 
              linewidth=2.5, color='#1f77b4', linestyle='--', label='3-Robot (Product)')
     
 if any(makespans_6robots):
     ax10.plot(states_6robots, makespans_6robots, marker='s', markersize=8, 
              linewidth=2.5, color='#ff7f0e', label='6-Robot (Task Allocation)')
-if any(product_makespans_6robots):
-    ax10.plot(states_6robots, product_makespans_6robots, marker='s', markersize=6, 
+filtered_product_6_combined = filter_product_makespans(product_makespans_6robots, makespans_6robots)
+if any(pm > 0 for pm in filtered_product_6_combined):
+    ax10.plot(states_6robots, filtered_product_6_combined, marker='s', markersize=6, 
              linewidth=2.5, color='#ff7f0e', linestyle='--', label='6-Robot (Product)')
     
 if any(makespans_15robots):
     ax10.plot(states_15robots, makespans_15robots, marker='^', markersize=8, 
              linewidth=2.5, color='#2ca02c', label='15-Robot (Task Allocation)')
-if any(product_makespans_15robots):
-    ax10.plot(states_15robots, product_makespans_15robots, marker='^', markersize=6, 
+filtered_product_15_combined = filter_product_makespans(product_makespans_15robots, makespans_15robots)
+if any(pm > 0 for pm in filtered_product_15_combined):
+    ax10.plot(states_15robots, filtered_product_15_combined, marker='^', markersize=6, 
              linewidth=2.5, color='#2ca02c', linestyle='--', label='15-Robot (Product)')
     
 if any(makespans_45robots):
     ax10.plot(states_45robots, makespans_45robots, marker='D', markersize=8, 
              linewidth=2.5, color='#d62728', label='45-Robot (Task Allocation)')
-if any(product_makespans_45robots):
-    ax10.plot(states_45robots, product_makespans_45robots, marker='D', markersize=6, 
+filtered_product_45_combined = filter_product_makespans(product_makespans_45robots, makespans_45robots)
+if any(pm > 0 for pm in filtered_product_45_combined):
+    ax10.plot(states_45robots, filtered_product_45_combined, marker='D', markersize=6, 
              linewidth=2.5, color='#d62728', linestyle='--', label='45-Robot (Product)')
 
 ax10.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')

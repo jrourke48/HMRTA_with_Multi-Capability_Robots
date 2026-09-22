@@ -438,7 +438,7 @@ void createTestEnvironmentRegions6(TS*& ts, GridWorld*& grid, Environment*& env,
         RobotCapability cap = (i % 3 == 1) ? RobotCapability::SENSOR_GPS : 
                               (i % 3 == 2) ? RobotCapability::MOVEMENT_GROUND : 
                               RobotCapability::SENSOR_CAMERA;
-        Robot* r = new Robot(i, "Rover_" + to_string(i), Point(350 + col, 350 + row));
+        Robot* r = new Robot(i, "Rover_" + to_string(i), Point(380 + col, 340 + row));
         r->initializeCapabilities(13);
         r->enableCapability(cap);
         mrs->addRobot(r);
@@ -494,7 +494,7 @@ void createTestEnvironmentRegions12(TS*& ts, GridWorld*& grid, Environment*& env
         RobotCapability cap = (i % 3 == 1) ? RobotCapability::SENSOR_GPS : 
                               (i % 3 == 2) ? RobotCapability::MOVEMENT_GROUND : 
                               RobotCapability::SENSOR_CAMERA;
-        Robot* r = new Robot(i, "Rover_" + to_string(i), Point(350 + col, 350 + row));
+        Robot* r = new Robot(i, "Rover_" + to_string(i), Point(380 + col, 340 + row));
         r->initializeCapabilities(13);
         r->enableCapability(cap);
         mrs->addRobot(r);
@@ -548,7 +548,7 @@ void createTestEnvironmentRegions18(TS*& ts, GridWorld*& grid, Environment*& env
         RobotCapability cap = (i % 3 == 1) ? RobotCapability::SENSOR_GPS : 
                               (i % 3 == 2) ? RobotCapability::MOVEMENT_GROUND : 
                               RobotCapability::SENSOR_CAMERA;
-        Robot* r = new Robot(i, "Rover_" + to_string(i), Point(350 + col, 350 + row));
+        Robot* r = new Robot(i, "Rover_" + to_string(i), Point(380 + col, 340 + row));
         r->initializeCapabilities(13);
         r->enableCapability(cap);
         mrs->addRobot(r);
@@ -602,7 +602,7 @@ void createTestEnvironmentRegions24(TS*& ts, GridWorld*& grid, Environment*& env
         RobotCapability cap = (i % 3 == 1) ? RobotCapability::SENSOR_GPS : 
                               (i % 3 == 2) ? RobotCapability::MOVEMENT_GROUND : 
                               RobotCapability::SENSOR_CAMERA;
-        Robot* r = new Robot(i, "Rover_" + to_string(i), Point(350 + col, 350 + row));
+        Robot* r = new Robot(i, "Rover_" + to_string(i), Point(380 + col, 340 + row));
         r->initializeCapabilities(13);
         r->enableCapability(cap);
         mrs->addRobot(r);
@@ -656,7 +656,7 @@ void createTestEnvironmentRegions30(TS*& ts, GridWorld*& grid, Environment*& env
         RobotCapability cap = (i % 3 == 1) ? RobotCapability::SENSOR_GPS : 
                               (i % 3 == 2) ? RobotCapability::MOVEMENT_GROUND : 
                               RobotCapability::SENSOR_CAMERA;
-        Robot* r = new Robot(i, "Rover_" + to_string(i), Point(350 + col, 350 + row));
+        Robot* r = new Robot(i, "Rover_" + to_string(i), Point(380 + col, 340 + row));
         r->initializeCapabilities(13);
         r->enableCapability(cap);
         mrs->addRobot(r);
@@ -710,7 +710,7 @@ void createTestEnvironmentRegions36(TS*& ts, GridWorld*& grid, Environment*& env
         RobotCapability cap = (i % 3 == 1) ? RobotCapability::SENSOR_GPS : 
                               (i % 3 == 2) ? RobotCapability::MOVEMENT_GROUND : 
                               RobotCapability::SENSOR_CAMERA;
-        Robot* r = new Robot(i, "Rover_" + to_string(i), Point(350 + col, 350 + row));
+        Robot* r = new Robot(i, "Rover_" + to_string(i), Point(380 + col, 340 + row));
         r->initializeCapabilities(13);
         r->enableCapability(cap);
         mrs->addRobot(r);
@@ -764,7 +764,7 @@ void createTestEnvironmentRegions38(TS*& ts, GridWorld*& grid, Environment*& env
         RobotCapability cap = (i % 3 == 1) ? RobotCapability::SENSOR_GPS : 
                               (i % 3 == 2) ? RobotCapability::MOVEMENT_GROUND : 
                               RobotCapability::SENSOR_CAMERA;
-        Robot* r = new Robot(i, "Rover_" + to_string(i), Point(350 + col, 350 + row));
+        Robot* r = new Robot(i, "Rover_" + to_string(i), Point(380 + col, 340 + row));
         r->initializeCapabilities(13);
         r->enableCapability(cap);
         mrs->addRobot(r);
@@ -818,12 +818,10 @@ void createTestEnvironmentRegions40(TS*& ts, GridWorld*& grid, Environment*& env
         RobotCapability cap = (i % 3 == 1) ? RobotCapability::SENSOR_GPS : 
                               (i % 3 == 2) ? RobotCapability::MOVEMENT_GROUND : 
                               RobotCapability::SENSOR_CAMERA;
-        Robot* r = new Robot(i, "Rover_" + to_string(i), Point(350 + col, 350 + row));
+        Robot* r = new Robot(i, "Rover_" + to_string(i), Point(380 + col, 340 + row));
         r->initializeCapabilities(13);
         r->enableCapability(cap);
         mrs->addRobot(r);
     }
     cout << "✓ MultiRobotSystem created with 6 robots (40-region TS)" << endl;
 }
-
-
