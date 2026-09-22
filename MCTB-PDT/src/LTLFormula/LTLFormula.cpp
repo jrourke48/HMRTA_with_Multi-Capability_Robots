@@ -126,6 +126,17 @@ int8_t LTLFormula::getBatchVal(uint16_t apId) const {
     }
     throw std::out_of_range("AP ID not found");
 }
+
+// Get the required capabilities for a specific AP ID
+std::vector<bool> LTLFormula::getRequiredCapabilities(uint16_t apId) const {
+    if (!batchAPs) throw std::runtime_error("BatchAPs vector is null");
+    for (const auto& batchAP : *batchAPs) {
+        if (batchAP.getAPId() == apId) {
+            return batchAP.getCapabilities();
+        }
+    }
+    throw std::out_of_range("AP ID not found");
+}
 // Get the total required capabilities
 uint16_t LTLFormula::getTotalRequiredCapabilities() const {
     if (!batchAPs) throw std::runtime_error("BatchAPs vector is null");
@@ -181,3 +192,4 @@ bool LTLFormula::isValid() const {
 void LTLFormula::buildTree() {
     // TODO: Implement tree building logic
 }
+

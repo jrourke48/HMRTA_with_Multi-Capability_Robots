@@ -1,9 +1,3 @@
 run_id,trial_number,timestamp,automaton_id,num_robots,robot_homogeneity,num_automaton_states,num_automaton_edges,total_required_capabilities,independent_required_capabilities,num_robots,total_robot_capabilities,independent_robot_capabilities,avg_capabilities_per_robot,capability_homogeneity,num_ts_regions,total_nodes_planning,total_nodes_traversed,total_nodes_pruned,nodes_satisfying_ltl,pruning_ratio,full_product_automaton_nodes,full_product_automaton_edges,explored_product_ratio,task_allocation_algorithm_memory_MB,full_product_automaton_memory_MB,total_computation_time_ms,product_computation_time_ms,tree_makespan_seconds,product_makespan_seconds,robots_utilized,robot_utilization_ratio,load_balance_variance
-96,1,"2026-09-14 20:23:40",5,10,0.200000,20,200,13,2,10,2,2,0.2,0.2,6,39,111,72,2,0.648649,0,0,0,0,0,5.703,0,2688,0,2,0.2,0
-97,1,"2026-09-14 20:23:40",5,10,0.600000,20,200,13,2,10,6,6,0.6,0.6,6,39,111,72,2,0.648649,0,0,0,0,0,5.64,0,2688,0,2,0.2,0
-98,1,"2026-09-14 20:23:40",5,10,1.000000,20,200,13,2,10,6,6,0.6,0.6,6,39,111,72,2,0.648649,0,0,0,0,0,5.131,0,1443,0,4,0.4,0
-99,1,"2026-09-14 20:23:41",5,10,1.400000,20,200,13,2,10,6,6,0.6,0.6,6,39,111,72,2,0.648649,0,0,0,0,0,5.038,0,959,0,4,0.4,0
-100,1,"2026-09-14 20:23:41",5,10,1.800000,20,200,13,2,10,6,6,0.6,0.6,6,39,111,72,2,0.648649,0,0,0,0,0,4.971,0,959,0,4,0.4,0
-101,1,"2026-09-14 20:23:41",5,10,2.200000,20,200,13,2,10,6,6,0.6,0.6,6,39,111,72,2,0.648649,0,0,0,0,0,4.949,0,959,0,4,0.4,0
-102,1,"2026-09-14 20:23:41",5,10,2.600000,20,200,13,2,10,6,6,0.6,0.6,6,39,111,72,2,0.648649,0,0,0,0,0,4.982,0,959,0,4,0.4,0
-103,1,"2026-09-14 20:23:41",5,10,3.000000,20,200,13,2,10,6,6,0.6,0.6,6,39,111,72,2,0.648649,0,0,0,0,0,4.956,0,959,0,4,0.4,0
+60,1,"2026-09-21 21:01:11",5,10,1.000000,20,208,34,10,10,70,10,7,1,6,39,111,72,2,0.648649,0,0,0,0,0,4.77,0,295,0,10,1,0
+61,1,"2026-09-21 21:01:11",5,10,1.200000,20,208,34,10,10,90,12,9,1.2,6,39,111,72,2,0.648649,0,0,0,0,0,4.738,0,295,0,10,1,0

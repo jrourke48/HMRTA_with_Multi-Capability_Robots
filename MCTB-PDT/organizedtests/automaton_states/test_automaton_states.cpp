@@ -668,8 +668,8 @@ void createTestEnvironment6(TS*& ts, GridWorld*& grid, Environment*& env, MultiR
     for (int i = 1; i <= 6; i++) {
         int col = (i - 1) % 3;  // 0-2 horizontal
         int row = (i - 1) / 3;  // 0-4 vertical
-        int x = 160 + col;
-        int y = 80 + row;
+        int x = 180 + col;
+        int y = 140 + row;
         
         // Rotate capabilities: GPS, MOVEMENT_GROUND, SENSOR_CAMERA
         RobotCapability cap = (i % 3 == 1) ? RobotCapability::SENSOR_GPS : 
@@ -748,8 +748,8 @@ void createTestEnvironment3(TS*& ts, GridWorld*& grid, Environment*& env, MultiR
     for (int i = 1; i <= 3; i++) {
         int col = (i - 1) % 3;  // 0-2 horizontal
         int row = (i - 1) / 3;  // 0 vertical
-        int x = 160 + col;
-        int y = 80 + row;
+        int x = 180 + col;
+        int y = 140 + row;
         
         // Rotate capabilities: GPS, MOVEMENT_GROUND, SENSOR_CAMERA
         RobotCapability cap = (i % 3 == 1) ? RobotCapability::SENSOR_GPS : 
@@ -825,12 +825,12 @@ void createTestEnvironment15(TS*& ts, GridWorld*& grid, Environment*& env, Multi
     mrs = new MultiRobotSystem();
     
     // Position 15 robots in a 3x5 grid, directly adjacent (1-unit spacing)
-    // Grid starts at (160, 80) in room 0
+    // Grid starts at (180, 140) in room 0
     for (int i = 1; i <= 15; i++) {
         int col = (i - 1) % 3;  // 0-2 horizontal
         int row = (i - 1) / 3;  // 0-4 vertical
-        int x = 160 + col;
-        int y = 80 + row;
+        int x = 180 + col;
+        int y = 140 + row;
         
         // Rotate capabilities: GPS, MOVEMENT_GROUND, SENSOR_CAMERA
         RobotCapability cap = (i % 3 == 1) ? RobotCapability::SENSOR_GPS : 
@@ -907,12 +907,12 @@ void createTestEnvironment45(TS*& ts, GridWorld*& grid, Environment*& env, Multi
     mrs = new MultiRobotSystem();
     
     // Position 45 robots in a 3x15 grid, directly adjacent (1-unit spacing)
-    // Grid starts at (160, 80) in room 0
+    // Grid starts at (180, 140) in room 0
     for (int i = 1; i <= 45; i++) {
         int col = (i - 1) % 3;  // 0-2 horizontal
         int row = (i - 1) / 3;  // 0-14 vertical
-        int x = 160 + col;
-        int y = 80 + row;
+        int x = 180 + col;
+        int y = 140 + row;
         
         // Rotate capabilities: GPS, MOVEMENT_GROUND, SENSOR_CAMERA
         RobotCapability cap = (i % 3 == 1) ? RobotCapability::SENSOR_GPS : 

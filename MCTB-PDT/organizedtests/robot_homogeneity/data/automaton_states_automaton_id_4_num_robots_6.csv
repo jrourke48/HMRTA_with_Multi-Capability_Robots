@@ -1,8 +1,5 @@
 run_id,trial_number,timestamp,automaton_id,num_robots,robot_homogeneity,num_automaton_states,num_automaton_edges,total_required_capabilities,independent_required_capabilities,num_robots,total_robot_capabilities,independent_robot_capabilities,avg_capabilities_per_robot,capability_homogeneity,num_ts_regions,total_nodes_planning,total_nodes_traversed,total_nodes_pruned,nodes_satisfying_ltl,pruning_ratio,full_product_automaton_nodes,full_product_automaton_edges,explored_product_ratio,task_allocation_algorithm_memory_MB,full_product_automaton_memory_MB,total_computation_time_ms,product_computation_time_ms,tree_makespan_seconds,product_makespan_seconds,robots_utilized,robot_utilization_ratio,load_balance_variance
-67,1,"2026-09-14 20:23:39",4,6,0.600000,16,142,10,3,6,4,4,0.666667,0.666667,6,38,188,150,9,0.797872,0,0,0,0,0,5.184,0,765,0,3,0.5,0
-68,1,"2026-09-14 20:23:39",4,6,1.000000,16,142,10,3,6,6,6,1,1,6,38,188,150,9,0.797872,0,0,0,0,0,5.294,0,765,0,3,0.5,0
-69,1,"2026-09-14 20:23:39",4,6,1.400000,16,142,10,3,6,6,6,1,1,6,38,188,150,9,0.797872,0,0,0,0,0,4.914,0,340,0,4,0.666667,0
-70,1,"2026-09-14 20:23:39",4,6,1.800000,16,142,10,3,6,6,6,1,1,6,38,188,150,9,0.797872,0,0,0,0,0,4.883,0,341,0,4,0.666667,0
-71,1,"2026-09-14 20:23:39",4,6,2.200000,16,142,10,3,6,6,6,1,1,6,38,188,150,9,0.797872,0,0,0,0,0,4.898,0,341,0,4,0.666667,0
-72,1,"2026-09-14 20:23:39",4,6,2.600000,16,142,10,3,6,6,6,1,1,6,38,188,150,9,0.797872,0,0,0,0,0,5.001,0,341,0,4,0.666667,0
-73,1,"2026-09-14 20:23:39",4,6,3.000000,16,142,10,3,6,6,6,1,1,6,38,188,150,9,0.797872,0,0,0,0,0,5.102,0,341,0,4,0.666667,0
+47,1,"2026-09-21 21:01:10",4,6,1.400000,12,80,25,8,6,36,8,6,1.33333,6,31,101,70,6,0.693069,0,0,0,0,0,2.162,0,172,0,6,1,0
+48,1,"2026-09-21 21:01:10",4,6,1.600000,12,80,25,8,6,42,10,7,1.66667,6,31,101,70,6,0.693069,0,0,0,0,0,2.142,0,172,0,6,1,0
+49,1,"2026-09-21 21:01:10",4,6,1.800000,12,80,25,8,6,48,11,8,1.83333,6,31,101,70,6,0.693069,0,0,0,0,0,2.698,0,172,0,6,1,0
+50,1,"2026-09-21 21:01:10",4,6,2.000000,12,80,25,8,6,54,12,9,2,6,31,101,70,6,0.693069,0,0,0,0,0,2.139,0,172,0,6,1,0

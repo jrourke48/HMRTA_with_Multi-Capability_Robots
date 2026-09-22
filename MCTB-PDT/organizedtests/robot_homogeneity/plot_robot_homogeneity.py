@@ -10,6 +10,20 @@ import os
 import glob
 import csv
 
+# Helper function to filter product makespans
+def filter_product_makespans(product_makespans, makespans, threshold=2.0):
+    """
+    Filter product makespans to only plot values that are <= threshold * tree makespan
+    Returns a list with invalid values replaced with None (matplotlib will skip them)
+    """
+    filtered = []
+    for pm, tm in zip(product_makespans, makespans):
+        if pm > 0 and tm > 0 and pm > threshold * tm:
+            filtered.append(None)  # Skip astronomical values
+        else:
+            filtered.append(pm)
+    return filtered
+
 # Create Plots directory if it doesn't exist
 os.makedirs('Plots', exist_ok=True)
 
@@ -104,10 +118,11 @@ for (automaton_id, robot_count) in sorted(config_data.keys()):
              marker=robot_markers[robot_count], markersize=8, 
              linewidth=2.5, label=label)
     
-    # Add product makespan overlay if non-zero values exist
-    if any(pm > 0 for pm in data['product_makespans']):
+    # Add product makespan overlay if non-zero values exist (only if within 2x tree makespan)
+    filtered_product_makespans = filter_product_makespans(data['product_makespans'], data['makespans'])
+    if any(pm > 0 for pm in filtered_product_makespans):
         label_prod = f'Auto {automaton_id}, {robot_count} Robots (Product)'
-        ax2.plot(data['homogeneities'], data['product_makespans'], 
+        ax2.plot(data['homogeneities'], filtered_product_makespans, 
                 marker=robot_markers[robot_count], markersize=6, 
                 linewidth=2.5, linestyle='--', label=label_prod)
     
@@ -127,22 +142,22 @@ print("✓ Plot saved as Plots/robot_homogeneity_makespan_all.png")
 plt.close(fig2)
 
 # ============================================================================
-# FIGURE 3-5: Computation Time by Robot Count (6, 10, 16)
+# FIGURE 3-8: Computation Time by Automaton (Combined Robot Counts)
 # ============================================================================
-for robot_count in [6, 10, 16]:
+max_automaton_id = max([cfg[0] for cfg in config_data.keys()], default=6)
+for automaton_id in range(1, max_automaton_id + 1):
     fig, ax = plt.subplots(figsize=(12, 7))
-    fig.suptitle(f'Robot Homogeneity vs Computation Time ({robot_count}-Robot Team)', 
+    fig.suptitle(f'Automaton {automaton_id}: Robot Homogeneity vs Computation Time (All Robot Counts)', 
                  fontsize=16, fontweight='bold')
     
-    max_automaton_id = max([cfg[0] for cfg in config_data.keys()], default=6)
-    for automaton_id in range(1, max_automaton_id + 1):
+    for robot_count in [6, 10, 16]:
         config_key = (automaton_id, robot_count)
         if config_key in config_data:
             data = config_data[config_key]
             ax.plot(data['homogeneities'], data['computation_times'], 
-                    marker='o', markersize=8, 
-                    linewidth=2.5, color=automaton_colors[automaton_id-1],
-                    label=f'Automaton {automaton_id}')
+                    marker=robot_markers[robot_count], markersize=8, 
+                    linewidth=2.5, color=robot_colors[robot_count],
+                    label=f'{robot_count} Robots')
     
     ax.set_xlabel('Robot Homogeneity (Independent Caps / Num Robots)', fontsize=12, fontweight='bold')
     ax.set_ylabel('Computation Time (ms)', fontsize=12, fontweight='bold')
@@ -150,34 +165,34 @@ for robot_count in [6, 10, 16]:
     ax.legend(loc='best', fontsize=10)
     
     plt.tight_layout()
-    plt.savefig(f'Plots/robot_homogeneity_computation_time_{robot_count}robots.png', dpi=300, bbox_inches='tight')
-    print(f"✓ Plot saved as Plots/robot_homogeneity_computation_time_{robot_count}robots.png")
+    plt.savefig(f'Plots/automaton_{automaton_id}_computation_time_combined.png', dpi=300, bbox_inches='tight')
+    print(f"✓ Plot saved as Plots/automaton_{automaton_id}_computation_time_combined.png")
     plt.close(fig)
 
 # ============================================================================
-# FIGURE 6-8: Makespan by Robot Count (6, 10, 16)
+# FIGURE 9-14: Makespan by Automaton (Combined Robot Counts)
 # ============================================================================
-for robot_count in [6, 10, 16]:
+for automaton_id in range(1, max_automaton_id + 1):
     fig, ax = plt.subplots(figsize=(12, 7))
-    fig.suptitle(f'Robot Homogeneity vs Makespan ({robot_count}-Robot Team)', 
+    fig.suptitle(f'Automaton {automaton_id}: Robot Homogeneity vs Makespan (All Robot Counts)', 
                  fontsize=16, fontweight='bold')
     
-    max_automaton_id = max([cfg[0] for cfg in config_data.keys()], default=6)
-    for automaton_id in range(1, max_automaton_id + 1):
+    for robot_count in [6, 10, 16]:
         config_key = (automaton_id, robot_count)
         if config_key in config_data:
             data = config_data[config_key]
             ax.plot(data['homogeneities'], data['makespans'], 
-                    marker='o', markersize=8, 
-                    linewidth=2.5, color=automaton_colors[automaton_id-1],
-                    label=f'Automaton {automaton_id} (Task Allocation)')
+                    marker=robot_markers[robot_count], markersize=8, 
+                    linewidth=2.5, color=robot_colors[robot_count],
+                    label=f'{robot_count} Robots (Task Allocation)')
             
-            # Add product makespan overlay if non-zero values exist
-            if any(pm > 0 for pm in data['product_makespans']):
-                ax.plot(data['homogeneities'], data['product_makespans'], 
-                        marker='s', markersize=6, 
-                        linewidth=2.5, color=automaton_colors[automaton_id-1], linestyle='--',
-                        label=f'Automaton {automaton_id} (Product)')
+            # Add product makespan overlay if non-zero values exist (only if within 2x tree makespan)
+            filtered_product_makespans = filter_product_makespans(data['product_makespans'], data['makespans'])
+            if any(pm > 0 for pm in filtered_product_makespans):
+                ax.plot(data['homogeneities'], filtered_product_makespans, 
+                        marker=robot_markers[robot_count], markersize=6, 
+                        linewidth=2.5, color=robot_colors[robot_count], linestyle='--',
+                        label=f'{robot_count} Robots (Product)')
     
     ax.set_xlabel('Robot Homogeneity (Independent Caps / Num Robots)', fontsize=12, fontweight='bold')
     ax.set_ylabel('Makespan (seconds)', fontsize=12, fontweight='bold')
@@ -185,63 +200,8 @@ for robot_count in [6, 10, 16]:
     ax.legend(loc='best', fontsize=9)
     
     plt.tight_layout()
-    plt.savefig(f'Plots/robot_homogeneity_makespan_{robot_count}robots.png', dpi=300, bbox_inches='tight')
-    print(f"✓ Plot saved as Plots/robot_homogeneity_makespan_{robot_count}robots.png")
-    
+    plt.savefig(f'Plots/automaton_{automaton_id}_makespan_combined.png', dpi=300, bbox_inches='tight')
+    print(f"✓ Plot saved as Plots/automaton_{automaton_id}_makespan_combined.png")
     plt.close(fig)
-
-# ============================================================================
-# FIGURE 9-14: Individual Automaton + Config Plots
-# ============================================================================
-for (automaton_id, robot_count) in sorted(config_data.keys()):
-    data = config_data[(automaton_id, robot_count)]
-    
-    # Computation Time
-    fig, ax = plt.subplots(figsize=(10, 6))
-    fig.suptitle(f'Automaton {automaton_id} ({robot_count} Robots): Robot Homogeneity vs Computation Time', 
-                 fontsize=14, fontweight='bold')
-    
-    ax.plot(data['homogeneities'], data['computation_times'], 
-            marker='o', markersize=10, linewidth=2.5, 
-            color=automaton_colors[automaton_id-1])
-    
-    # Add value labels
-    for hom, t in zip(data['homogeneities'], data['computation_times']):
-        ax.text(hom, t, f'{t:.2f}ms', ha='center', va='bottom', fontsize=9)
-    
-    ax.set_xlabel('Robot Homogeneity', fontsize=12, fontweight='bold')
-    ax.set_ylabel('Computation Time (ms)', fontsize=12, fontweight='bold')
-    ax.grid(True, alpha=0.3)
-    
-    plt.tight_layout()
-    plt.savefig(f'Plots/automaton_{automaton_id}_{robot_count}robots_computation_time.png', 
-                dpi=300, bbox_inches='tight')
-    print(f"✓ Plot saved as Plots/automaton_{automaton_id}_{robot_count}robots_computation_time.png")
-    plt.close(fig)
-    
-    # Makespan (if available)
-    if any(m > 0 for m in data['makespans']):
-        fig, ax = plt.subplots(figsize=(10, 6))
-        fig.suptitle(f'Automaton {automaton_id} ({robot_count} Robots): Robot Homogeneity vs Makespan', 
-                     fontsize=14, fontweight='bold')
-        
-        ax.plot(data['homogeneities'], data['makespans'], 
-                marker='o', markersize=10, linewidth=2.5, 
-                color=automaton_colors[automaton_id-1])
-        
-        # Add value labels
-        for hom, m in zip(data['homogeneities'], data['makespans']):
-            if m > 0:
-                ax.text(hom, m, f'{m:.0f}s', ha='center', va='bottom', fontsize=9)
-        
-        ax.set_xlabel('Robot Homogeneity', fontsize=12, fontweight='bold')
-        ax.set_ylabel('Makespan (seconds)', fontsize=12, fontweight='bold')
-        ax.grid(True, alpha=0.3)
-        
-        plt.tight_layout()
-        plt.savefig(f'Plots/automaton_{automaton_id}_{robot_count}robots_makespan.png', 
-                    dpi=300, bbox_inches='tight')
-        print(f"✓ Plot saved as Plots/automaton_{automaton_id}_{robot_count}robots_makespan.png")
-        plt.close(fig)
 
 print("\n✓ All plots generated successfully!")

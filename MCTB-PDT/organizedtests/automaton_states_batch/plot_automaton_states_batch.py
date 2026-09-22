@@ -10,6 +10,20 @@ import os
 import glob
 import csv
 
+# Helper function to filter product makespans
+def filter_product_makespans(product_makespans, makespans, threshold=2.0):
+    """
+    Filter product makespans to only plot values that are <= threshold * tree makespan
+    Returns a list with invalid values replaced with None (matplotlib will skip them)
+    """
+    filtered = []
+    for pm, tm in zip(product_makespans, makespans):
+        if pm > 0 and tm > 0 and pm > threshold * tm:
+            filtered.append(None)  # Skip astronomical values
+        else:
+            filtered.append(pm)
+    return filtered
+
 # Create Plots directory if it doesn't exist
 os.makedirs('Plots', exist_ok=True)
 

@@ -117,24 +117,24 @@ digraph ComprehensiveOptimalPath {
     color=darkred;
     penwidth=2;
 
-    path_summary [shape=note, label="Optimal Path Summary\nTotal Steps: 8\nFinal Cost: 666\nTotal Execution Time: 2652s\n", fillcolor="#FFFFCC", penwidth=2];
+    path_summary [shape=note, label="Optimal Path Summary\nTotal Steps: 8\nFinal Cost: 102\nTotal Execution Time: 707s\n", fillcolor="#FFFFCC", penwidth=2];
 
     opt_0 [shape=box, label="Step 0\nNBA: 66 | TS: 0\nCost: 0s | Total: 0s\n-----\nAllocated Robots:\n", fillcolor="#B3E5FC", penwidth=1.5];
-    opt_1 [shape=box, label="Step 1\nNBA: 11 | TS: 1\nCost: 161s | Total: 483s\n-----\nAllocated Robots:\n  R23: 161s\n  R25: 161s\n  R33: 161s\n", fillcolor="#B3E5FC", penwidth=1.5];
-    opt_2 [shape=box, label="Step 2\nNBA: 10 | TS: 2\nCost: 274s | Total: 822s\n-----\nAllocated Robots:\n  R23: 274s\n  R25: 274s\n  R33: 274s\n", fillcolor="#B3E5FC", penwidth=1.5];
-    opt_3 [shape=box, label="Step 3\nNBA: 4 | TS: 3\nCost: 305s | Total: 915s\n-----\nAllocated Robots:\n  R23: 305s\n  R25: 305s\n  R33: 305s\n", fillcolor="#B3E5FC", penwidth=1.5];
-    opt_4 [shape=box, label="Step 4\nNBA: 3 | TS: 5\nCost: 305s | Total: 1314s\n-----\nAllocated Robots:\n  R1: 133s\n  R21: 133s\n  R32: 133s\n", fillcolor="#B3E5FC", penwidth=1.5];
-    opt_5 [shape=box, label="Step 5\nNBA: 2 | TS: 4\nCost: 305s | Total: 1569s\n-----\nAllocated Robots:\n  R24: 85s\n  R31: 85s\n  R42: 85s\n", fillcolor="#B3E5FC", penwidth=1.5];
-    opt_6 [shape=box, label="Step 6\nNBA: 1 | TS: 0\nCost: 505s | Total: 2169s\n-----\nAllocated Robots:\n  R23: 505s\n  R25: 505s\n  R33: 505s\n", fillcolor="#B3E5FC", penwidth=1.5];
-    opt_7 [shape=box, label="Step 7\nNBA: 0 | TS: 1\nCost: 666s | Total: 2652s\n-----\nAllocated Robots:\n  R23: 666s\n  R25: 666s\n  R33: 666s\n", fillcolor="#FF6B6B", penwidth=3, color=darkred, fontweight=bold, fontsize=11];
+    opt_1 [shape=box, label="Step 1\nNBA: 11 | TS: 1\nCost: 1s | Total: 3s\n-----\nAllocated Robots:\n  R16: 1s\n  R38: 1s\n  R39: 1s\n", fillcolor="#B3E5FC", penwidth=1.5];
+    opt_2 [shape=box, label="Step 2\nNBA: 21 | TS: 1\nCost: 2s | Total: 6s\n-----\nAllocated Robots:\n  R16: 2s\n  R38: 2s\n  R39: 2s\n", fillcolor="#B3E5FC", penwidth=1.5];
+    opt_3 [shape=box, label="Step 3\nNBA: 25 | TS: 0\nCost: 2s | Total: 9s\n-----\nAllocated Robots:\n  R20: 1s\n  R21: 1s\n  R22: 1s\n", fillcolor="#B3E5FC", penwidth=1.5];
+    opt_4 [shape=box, label="Step 4\nNBA: 33 | TS: 4\nCost: 49s | Total: 156s\n-----\nAllocated Robots:\n  R5: 49s\n  R29: 49s\n  R30: 49s\n", fillcolor="#B3E5FC", penwidth=1.5];
+    opt_5 [shape=box, label="Step 5\nNBA: 48 | TS: 5\nCost: 99s | Total: 404s\n-----\nAllocated Robots:\n  R6: 99s\n  R29: 99s\n  R37: 99s\n", fillcolor="#B3E5FC", penwidth=1.5];
+    opt_6 [shape=box, label="Step 6\nNBA: 5 | TS: 3\nCost: 99s | Total: 407s\n-----\nAllocated Robots:\n  R1: 1s\n  R2: 1s\n  R45: 1s\n", fillcolor="#B3E5FC", penwidth=1.5];
+    opt_7 [shape=box, label="Step 7\nNBA: 0 | TS: 2\nCost: 102s | Total: 707s\n-----\nAllocated Robots:\n  R16: 102s\n  R38: 102s\n  R39: 102s\n", fillcolor="#FF6B6B", penwidth=3, color=darkred, fontweight=bold, fontsize=11];
 
-    opt_0 -> opt_1 [label="Δ=161s", penwidth=2, color=darkred];
-    opt_1 -> opt_2 [label="Δ=113s", penwidth=2, color=darkred];
-    opt_2 -> opt_3 [label="Δ=31s", penwidth=2, color=darkred];
-    opt_3 -> opt_4 [label="Δ=0s", penwidth=2, color=darkred];
-    opt_4 -> opt_5 [label="Δ=0s", penwidth=2, color=darkred];
-    opt_5 -> opt_6 [label="Δ=200s", penwidth=2, color=darkred];
-    opt_6 -> opt_7 [label="Δ=161s", penwidth=2, color=darkred];
+    opt_0 -> opt_1 [label="Δ=1s", penwidth=2, color=darkred];
+    opt_1 -> opt_2 [label="Δ=1s", penwidth=2, color=darkred];
+    opt_2 -> opt_3 [label="Δ=0s", penwidth=2, color=darkred];
+    opt_3 -> opt_4 [label="Δ=47s", penwidth=2, color=darkred];
+    opt_4 -> opt_5 [label="Δ=50s", penwidth=2, color=darkred];
+    opt_5 -> opt_6 [label="Δ=0s", penwidth=2, color=darkred];
+    opt_6 -> opt_7 [label="Δ=3s", penwidth=2, color=darkred];
   }
 
   // Connections between clusters

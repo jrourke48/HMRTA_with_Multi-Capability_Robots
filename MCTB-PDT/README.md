@@ -4,15 +4,16 @@
 ### Before Tuesday:
 1. Work on a more comprehensive, detailed README
 ### Before School:
-3. Build the product automaton
+3. Build the product automaton: done
 4. Finish introduction and literature review
-5. Add Tests for the Multi-Capability robots
-6. Add Tests for the exclusive and complementary task algorithms
+5. Add Tests for the Multi-Capability robots: done
+6. Add Tests for the exclusive and complementary task algorithms: done
 ### Fall: 
 7. Test against the product automaton
 8. Test test test
 9. Rest of writing
 ### Reach Goals:
+implement a random sampling task allocation
 10. Test Against a MILP Formulation
 11. Weighing other costs than time
 ### Algorithm Innefficiencies

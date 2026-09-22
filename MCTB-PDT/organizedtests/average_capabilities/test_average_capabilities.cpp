@@ -228,14 +228,16 @@ int main() {
  * Test 2: Nested Next Operators with Sequencing → RENAMED TO 1
  * Combines infinitely-often with chained next operators
  * Complexity: 4 APs, 6 Automaton States
- * G(F("p0" & X("p1" & X"p2"))) & G(F("p3"))
+ * Uses all 6 robot capabilities: GPS, MOVEMENT_GROUND, SENSOR_CAMERA, GRIPPER, TOOL, PAYLOAD
  */
 BuchiAutomaton* createTestInfiniteBuchiAutomaton1() {
     string ltl_str = "(G(F(\"p0\")) & G(F(\"p2\")))";
     
     vector<BatchAtomicProposition> batchAPs;
-    batchAPs.push_back(BatchAtomicProposition(0, 0, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(2, 2, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
+    // p0: uses MOVEMENT_GROUND, SENSOR_CAMERA, SENSOR_GPS, MANIPULATION_GRIPPER
+    batchAPs.push_back(BatchAtomicProposition(0, 0, {true, false, false, true, false, true, false, false, true, false, false, false, false}, 0));
+    // p2: uses SENSOR_GPS, MANIPULATION_GRIPPER, MANIPULATION_TOOL, CAPABILITY_PAYLOAD
+    batchAPs.push_back(BatchAtomicProposition(2, 2, {false, false, false, false, false, true, false, false, true, true, false, false, true}, 0));
     
     LTLFormula* ltlFormula = new LTLFormula(ltl_str, batchAPs);
     BuchiAutomaton* buchi = new BuchiAutomaton(ltlFormula);
@@ -250,16 +252,16 @@ BuchiAutomaton* createTestInfiniteBuchiAutomaton1() {
  * Test 3: Mixed Next and Until Operators → RENAMED TO 2
  * Combines infinitely-often with until (weak until) patterns
  * Complexity: 5 APs, 10 Automaton States
- * G(F("p0")) & G(F("p1" & X("p2"))) & G(F(!"p3" U "p4") & G(F("p3")))
+ * Uses all 6 robot capabilities across multiple atomic propositions
  */
 BuchiAutomaton* createTestInfiniteBuchiAutomaton2() {
     string ltl_str = "G(F(\"p0\" & X(\"p1\" & X\"p2\"))) & G(F(\"p3\"))";
     
     vector<BatchAtomicProposition> batchAPs;
-    batchAPs.push_back(BatchAtomicProposition(0, 0, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(1, 1, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(2, 2, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(3, 3, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(0, 0, {true, false, false, true, false, true, false, false, true, true, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(1, 1, {true, false, false, true, false, true, false, false, false, true, false, false, true}, 0));
+    batchAPs.push_back(BatchAtomicProposition(2, 2, {false, false, false, true, false, true, false, false, true, true, false, false, true}, 0));
+    batchAPs.push_back(BatchAtomicProposition(3, 3, {true, false, false, false, false, true, false, false, true, true, false, false, true}, 0));
 
     LTLFormula* ltlFormula = new LTLFormula(ltl_str, batchAPs);
     BuchiAutomaton* buchi = new BuchiAutomaton(ltlFormula);
@@ -273,17 +275,17 @@ BuchiAutomaton* createTestInfiniteBuchiAutomaton2() {
  * Test 4: Until with Disjunctive Branching → RENAMED TO 3
  * Introduces disjunction at top level with complex nested structure
  * Complexity: 5 APs, 16 Automaton States
- * G((F("p0" & X(!"p1" U "p2")))) & G(F("p1")) & (G(F("p3")) | G(F("p4" & X("p0"))))
+ * Uses all 6 robot capabilities
  */
 BuchiAutomaton* createTestInfiniteBuchiAutomaton3() {
     string ltl_str = "(G(F(\"p0\")) & G(F(\"p1\" & X(\"p2\"))) & G(F(!\"p3\" U \"p4\") & G(F(\"p3\"))))";
     
     vector<BatchAtomicProposition> batchAPs;
-    batchAPs.push_back(BatchAtomicProposition(0, 0, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(1, 1, {true, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(2, 2, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(3, 3, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(4, 4, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(0, 0, {true, false, false, true, false, true, false, false, true, true, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(1, 1, {true, false, false, true, false, true, false, false, true, false, false, false, true}, 0));
+    batchAPs.push_back(BatchAtomicProposition(2, 2, {false, false, false, true, false, true, false, false, true, true, false, false, true}, 0));
+    batchAPs.push_back(BatchAtomicProposition(3, 3, {true, false, false, false, false, true, false, false, true, true, false, false, true}, 0));
+    batchAPs.push_back(BatchAtomicProposition(4, 4, {true, false, false, true, false, false, false, false, true, true, false, false, true}, 0));
     
     LTLFormula* ltlFormula = new LTLFormula(ltl_str, batchAPs);
     BuchiAutomaton* buchi = new BuchiAutomaton(ltlFormula);
@@ -297,17 +299,17 @@ BuchiAutomaton* createTestInfiniteBuchiAutomaton3() {
  * Test 5: Multiple Sequential Until Conditions → RENAMED TO 4
  * Deep nesting of until operators with complex boolean combinations
  * Complexity: 10 APs, 20 Automaton States
- * G((F(!"p0" U ("p1" & F("p2"))) & G(F("p0")) & G(F("p3")) & F(!"p3" U ("p4" & F("p5"))) & F("p3") & F("p6" & X("p7")) & G(F("p8")) & G(F(!"p8" U "p9"))))
+ * Uses all 6 robot capabilities distributed across atomic propositions
  */
 BuchiAutomaton* createTestInfiniteBuchiAutomaton4() {
     string ltl_str = "G((F(\"p0\" & X(!\"p1\" U \"p2\")))) & G(F(\"p1\")) & (G(F(\"p3\")) | G(F(\"p4\" & X(\"p0\"))))";
     
     vector<BatchAtomicProposition> batchAPs;
-    batchAPs.push_back(BatchAtomicProposition(0, 0, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(1, 1, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(2, 2, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(3, 3, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(4, 4, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(0, 0, {true, false, false, true, false, true, false, false, true, true, false, false, false}, 0));
+    batchAPs.push_back(BatchAtomicProposition(1, 1, {true, false, false, true, false, true, false, false, false, true, false, false, true}, 0));
+    batchAPs.push_back(BatchAtomicProposition(2, 2, {true, false, false, false, false, true, false, false, true, true, false, false, true}, 0));
+    batchAPs.push_back(BatchAtomicProposition(3, 3, {false, false, false, true, false, true, false, false, true, true, false, false, true}, 0));
+    batchAPs.push_back(BatchAtomicProposition(4, 4, {true, false, false, true, false, false, false, false, true, true, false, false, true}, 0));
 
     LTLFormula* ltlFormula = new LTLFormula(ltl_str, batchAPs);
     BuchiAutomaton* buchi = new BuchiAutomaton(ltlFormula);
@@ -327,13 +329,17 @@ BuchiAutomaton* createTestInfiniteBuchiAutomaton5() {
     string ltl_str = "(G((F(!\"p0\" U (\"p1\" & F(\"p2\"))) & G(F(\"p0\")) & G(F(\"p3\")) & F(!\"p3\" U (\"p4\" & F(\"p5\"))) & F(\"p3\") & F(\"p6\" & X(\"p7\")) & G(F(\"p8\")) & G(F(!\"p8\" U \"p9\"))))";
     
     vector<BatchAtomicProposition> batchAPs;
+    // Capability indices in robot pool: 0 (MOVEMENT_GROUND), 3 (SENSOR_CAMERA), 5 (SENSOR_GPS), 8 (GRIPPER), 9 (TOOL), 12 (PAYLOAD)
     for (int i = 0; i < 10; i++) {
         uint16_t tsState = i % 6;
-        bool hasGPS = (i % 2 == 0);
         vector<bool> caps(13, false);
-        if (hasGPS) caps[5] = true;
-        if (i % 3 == 1) caps[0] = true;
-        caps[5] = true;  // All have GPS
+        // Distribute all 6 capabilities across the 10 propositions
+        caps[0] = true;  // MOVEMENT_GROUND
+        caps[3] = (i % 6 >= 1);  // SENSOR_CAMERA
+        caps[5] = (i % 6 >= 2);  // SENSOR_GPS
+        caps[8] = (i % 6 >= 3);  // MANIPULATION_GRIPPER
+        caps[9] = (i % 6 >= 4);  // MANIPULATION_TOOL
+        caps[12] = (i % 6 >= 5);  // CAPABILITY_PAYLOAD
         
         batchAPs.push_back(BatchAtomicProposition(i, tsState, caps, 0));
     }
@@ -349,115 +355,37 @@ BuchiAutomaton* createTestInfiniteBuchiAutomaton5() {
 /**
  * Test 8: Standardized High-Complexity Formula (Disjunctive Pattern) → RENAMED TO 6
  * 18 APs, 38 Automaton States, until-based liveness properties, variant of Test 7 with OR instead of AND
- * Complexity: 18 APs, standardized G(F(!pX U pY)) pattern throughout, disjunctive top-level
+ * Uses all 6 robot capabilities distributed across 10 atomic propositions
  */
 BuchiAutomaton* createTestInfiniteBuchiAutomaton6() {
     string ltl_str = "G((F(\"p0\" & X(!\"p1\" U \"p2\")))) & G(F(\"p1\")) & (G(F(\"p3\")) & G(F(\"p5\")) & G(F((\"p8\") & X(\"p9\")))) | G(F(\"p4\" & X(\"p0\")) & G(F(\"p6\" & X(\"p7\")))))";
     
     vector<BatchAtomicProposition> batchAPs;
-    batchAPs.push_back(BatchAtomicProposition(0, 0, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(1, 1, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(2, 2, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(3, 3, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(4, 4, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(5, 5, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));
-    batchAPs.push_back(BatchAtomicProposition(6, 2, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));  // p6
-    batchAPs.push_back(BatchAtomicProposition(7, 4, {true, false, false, true, false, true, false, false, false, false, false, false, false}, 0));  // p7
-    batchAPs.push_back(BatchAtomicProposition(8, 3, {true, false, false, true, false, true, false, false, false, false, false, false, false}, 0));  // p8
-    batchAPs.push_back(BatchAtomicProposition(9, 4, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));  // p9
+    // Capability indices: 0 (MOVEMENT_GROUND), 3 (SENSOR_CAMERA), 5 (SENSOR_GPS), 8 (GRIPPER), 9 (TOOL), 12 (PAYLOAD)
+    // p0: uses all 6 capabilities
+    batchAPs.push_back(BatchAtomicProposition(0, 0, {true, false, false, true, false, true, false, false, true, true, false, false, true}, 0));
+    // p1: uses 5 capabilities (skip TOOL)
+    batchAPs.push_back(BatchAtomicProposition(1, 1, {true, false, false, true, false, true, false, false, true, false, false, false, true}, 0));
+    // p2: uses 5 capabilities (skip GRIPPER)
+    batchAPs.push_back(BatchAtomicProposition(2, 2, {true, false, false, true, false, true, false, false, false, true, false, false, true}, 0));
+    // p3: uses 4 capabilities (SENSOR_CAMERA, SENSOR_GPS, TOOL, PAYLOAD)
+    batchAPs.push_back(BatchAtomicProposition(3, 3, {false, false, false, true, false, true, false, false, false, true, false, false, true}, 0));
+    // p4: uses 5 capabilities (skip SENSOR_CAMERA)
+    batchAPs.push_back(BatchAtomicProposition(4, 4, {true, false, false, false, false, true, false, false, true, true, false, false, true}, 0));
+    // p5: uses 4 capabilities (MOVEMENT_GROUND, SENSOR_GPS, GRIPPER, PAYLOAD)
+    batchAPs.push_back(BatchAtomicProposition(5, 5, {true, false, false, false, false, true, false, false, true, false, false, false, true}, 0));
+    // p6: uses 5 capabilities (skip PAYLOAD)
+    batchAPs.push_back(BatchAtomicProposition(6, 2, {true, false, false, true, false, true, false, false, true, true, false, false, false}, 0));
+    // p7: uses 4 capabilities (SENSOR_CAMERA, SENSOR_GPS, GRIPPER, TOOL)
+    batchAPs.push_back(BatchAtomicProposition(7, 4, {false, false, false, true, false, true, false, false, true, true, false, false, false}, 0));
+    // p8: uses 5 capabilities (MOVEMENT_GROUND, SENSOR_GPS, GRIPPER, TOOL, PAYLOAD)
+    batchAPs.push_back(BatchAtomicProposition(8, 3, {true, false, false, false, false, true, false, false, true, true, false, false, true}, 0));
+    // p9: uses all 6 capabilities
+    batchAPs.push_back(BatchAtomicProposition(9, 4, {true, false, false, true, false, true, false, false, true, true, false, false, true}, 0));
 
     LTLFormula* ltlFormula = new LTLFormula(ltl_str, batchAPs);
     BuchiAutomaton* buchi = new BuchiAutomaton(ltlFormula);
     return buchi;
-}
-
-// REMOVED: createTestInfiniteBuchiAutomaton7 (originally test 8 - placeholder, actual moved to createTestInfiniteBuchiAutomaton6)
-
-/**
- * REMOVED: Automaton 8
- */
-BuchiAutomaton* createTestInfiniteBuchiAutomaton7_REMOVED() {
-    return nullptr;  // Removed automaton
-}
-
-// REMOVED: createTestInfiniteBuchiAutomaton8 (originally test 6)
-
-/**
- * REMOVED: Automaton 9
- */
-BuchiAutomaton* createTestInfiniteBuchiAutomaton8_REMOVED() {
-    return nullptr;  // Removed automaton
-}
-
-// REMOVED: createTestInfiniteBuchiAutomaton9 (originally test 9)
-
-/**
- * REMOVED: Automaton 10
- */
-BuchiAutomaton* createTestInfiniteBuchiAutomaton9_REMOVED() {
-    return nullptr;  // Removed automaton
-}
-// REMOVED: createTestInfiniteBuchiAutomaton10 (originally test 10)
-
-/**
- * REMOVED: Automaton 11
- */
-BuchiAutomaton* createTestInfiniteBuchiAutomaton10_REMOVED() {
-    return nullptr;  // Removed automaton
-}
-
-// REMOVED: createTestInfiniteBuchiAutomaton11 (originally test 11)
-
-/**
- * REMOVED: Automaton 12
- */
-BuchiAutomaton* createTestInfiniteBuchiAutomaton11_REMOVED() {
-    return nullptr;  // Removed automaton
-}
-
-// REMOVED: Automaton 12 functions 13-16 follow
-
-/**
- * REMOVED: Automaton 13
- */
-BuchiAutomaton* createTestInfiniteBuchiAutomaton12_REMOVED() {
-    return nullptr;  // Removed automaton
-}
-
-// REMOVED: createTestInfiniteBuchiAutomaton13 (originally test 12)
-
-/**
- * REMOVED: Automaton 14
- */
-BuchiAutomaton* createTestInfiniteBuchiAutomaton13_REMOVED() {
-    return nullptr;  // Removed automaton
-}
-
-// REMOVED: createTestInfiniteBuchiAutomaton14 (originally test 14)
-
-/**
- * REMOVED: Automaton 15
- */
-BuchiAutomaton* createTestInfiniteBuchiAutomaton14_REMOVED() {
-    return nullptr;  // Removed automaton
-}
-
-// REMOVED: createTestInfiniteBuchiAutomaton15 (originally test 15)
-
-/**
- * REMOVED: Automaton 16
- */
-BuchiAutomaton* createTestInfiniteBuchiAutomaton15_REMOVED() {
-    return nullptr;  // Removed automaton
-}
-
-// REMOVED: createTestInfiniteBuchiAutomaton16 (originally test 16)
-
-/**
- * REMOVED: Automaton 16 - End of automata implementations
- */
-BuchiAutomaton* createTestInfiniteBuchiAutomaton16_REMOVED() {
-    return nullptr;  // Removed automaton
 }
 
 // ============================================================================
@@ -516,43 +444,48 @@ void createTestEnvironment(TS*& ts, GridWorld*& grid, Environment*& env, MultiRo
     env->mapTSStateToGrid(5, Point(45, 175), 90, 70);   // State 5 centered at (50,150)
     cout << "✓ Mapped 6 states to grid regions" << endl;
     
-    // Create MultiRobotSystem with 6 robots
+    // Create MultiRobotSystem with robots
     mrs = new MultiRobotSystem();
     // Determine if the average capability is a whole number
     bool wholeAveCap = (static_cast<int>(2*aveCap) % 2 == 0);
+    double currentAveCap = aveCap;  // Store original for toggling
     
-    // Position 15 robots in a 3x2 grid, directly adjacent (1-unit spacing)
-    // Grid starts at (160, 80) in room 0
+    // Position robots in a 3xN grid, directly adjacent (1-unit spacing)
+    // Grid starts at (180, 140) in room 0
     for (int i = 1; i <= robotCount; i++) {
         int col = (i - 1) % 3;  // 0-2 horizontal
-        int row = (i - 1) / 3;  // 0-4 vertical
-        int x = 160 + col;
-        int y = 80 + row;
+        int row = (i - 1) / 3;  // 0-N vertical
+        int x = 180 + col;
+        int y = 140 + row;
         //initialize robot
         Robot* r = new Robot(i, "Rover_" + to_string(i), Point(x, y));
         r->initializeCapabilities(13);
         
-        //toggle number of capabilites per robot if avecap is not a whole number num robots must be even
+        //toggle number of capabilities per robot if avecap is not a whole number
+        int numCaps = static_cast<int>(currentAveCap);
         if (!wholeAveCap) {
             if (i % 2 == 0) {
-                aveCap = static_cast<int>(2*aveCap) / 2;  // Toggle to half if not whole number
+                numCaps = static_cast<int>(2*aveCap) / 2;  // Lower half
             } else {
-                aveCap = static_cast<int>(2*aveCap + 1) / 2;  // Toggle to the other half if not whole number
+                numCaps = static_cast<int>(2*aveCap + 1) / 2;  // Upper half
             }
         }
-        for (int j = 0; j < aveCap; j++){
-            // Rotate capabilities: GPS, MOVEMENT_GROUND, SENSOR_CAMERA
-            RobotCapability cap = (i+j % 6 == 1) ? RobotCapability::SENSOR_GPS : 
-                                (i+j % 6 == 2) ? RobotCapability::MOVEMENT_GROUND : 
-                                (i+j % 6 == 3) ? RobotCapability::SENSOR_CAMERA :
-                                (i+j % 6 == 4) ? RobotCapability::MANIPULATION_GRIPPER :
-                                (i+j % 6 == 5) ? RobotCapability::MANIPULATION_TOOL :
-                                RobotCapability::CAPABILITY_PAYLOAD;
+        
+        for (int j = 0; j < numCaps; j++){
+            // Rotate capabilities with correct operator precedence: (i+j) % 6
+            // Capabilities in pool: 0=MOVEMENT_GROUND, 3=SENSOR_CAMERA, 5=SENSOR_GPS, 8=GRIPPER, 9=TOOL, 12=PAYLOAD
+            int capIndex = ((i-1) + j) % 6;  // Robot index offset to avoid i=0
+            RobotCapability cap = (capIndex == 0) ? RobotCapability::MOVEMENT_GROUND : 
+                                  (capIndex == 1) ? RobotCapability::SENSOR_CAMERA : 
+                                  (capIndex == 2) ? RobotCapability::SENSOR_GPS :
+                                  (capIndex == 3) ? RobotCapability::MANIPULATION_GRIPPER :
+                                  (capIndex == 4) ? RobotCapability::MANIPULATION_TOOL :
+                                  RobotCapability::CAPABILITY_PAYLOAD;
             r->enableCapability(cap);    
         }
         mrs->addRobot(r);
     }
-    cout << "✓ MultiRobotSystem created with 6 robots in a 3x2 grid" << endl;
+    cout << "✓ MultiRobotSystem created with " << robotCount << " robots in a 3x" << (robotCount/3 + (robotCount%3 ? 1 : 0)) << " grid" << endl;
 }
 
 // ============================================================================
