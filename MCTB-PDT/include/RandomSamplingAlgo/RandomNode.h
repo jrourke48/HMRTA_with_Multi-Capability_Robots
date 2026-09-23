@@ -1,5 +1,8 @@
+#ifndef RANDOM_NODE_H
+#define RANDOM_NODE_H
+
 #include <vector>
-#include "Edge_Node.h"
+#include "../../Automatons/Edge_Node.h"
 
 class Random_Node {
     // Define the members and methods for the Random_Node class here
@@ -11,9 +14,12 @@ class Random_Node {
         std::vector<uint16_t> times; // Task requirements for this node
         uint16_t curmakespan; // Time associated with this node
         Random_Node* next; // Pointer to next node in the path
+        //set curmakespan should only be called internally
+        void setCurmakespan();
 
     public:
-        Random_Node(uint16_t id, Node* nodePtr, const std::vector<std::vector<uint8_t>>& allocations);
+        Random_Node(uint16_t id, Node* nodePtr, const std::vector<uint16_t> trueAPS, const std::vector<std::vector<uint8_t>>& allocations, std::vector<uint16_t> times);
+        Random_Node(uint16_t id, Node* nodePtr, const std::vector<uint16_t> trueAPS, const std::vector<std::vector<uint8_t>>& allocations, std::vector<uint16_t> times, Random_Node* next);
         
         // Node ID getters and setters
         uint16_t getNodeId() const;
@@ -24,8 +30,11 @@ class Random_Node {
         void setautomatonState(Node* nodePtr);
         
         // Task allocation getters and setters
-        const std::vector<std::vector<uint8_t>>& getTaskAllocation() const;
-        void setTaskAllocation(const std::vector<std::vector<uint8_t>>& allocations);
+        const std::vector<std::vector<uint8_t>>& getTaskAllocations() const;
+        void setTaskAllocations(const std::vector<std::vector<uint8_t>>& allocations);
+
+        const std::vector<uint8_t> getTaskAllocation(uint16_t trueAP) const;
+        
         
         // True APs getters and setters
         const std::vector<uint16_t>& getTrueAPs() const;
@@ -37,9 +46,10 @@ class Random_Node {
         
         // Current makespan getters and setters
         uint16_t getCurmakespan() const;
-        void setCurmakespan(uint16_t makespan);
         
         // Linked list navigation
         Random_Node* getNext() const;
         void setNext(Random_Node* node);
 };
+
+#endif

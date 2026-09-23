@@ -1,6 +1,8 @@
-#include "RandomSamplingTaskAllocation.h"
+#include "RandomSamplingAlgo/RandomSamplingTaskAllocation.h"
+#include "RandomSamplingAlgo/RandomNode.h"
 #include <algorithm>
 #include <map>
+#include <ctime>
 
 //========================
 // CONSTRUCTORS & DESTRUCTOR
@@ -42,26 +44,31 @@ RandomSamplingTaskAllocation::RandomSamplingTaskAllocation(
 void RandomSamplingTaskAllocation::run() {
     // Extract accepting SCCs from the Büchi automaton before starting the iterations
     setAcceptingSCCs();
-    std::clock_t startTime = std::clock();
+    clock_t startTime = clock();
     while(Iterations < maxIterations && computationTime < timeLimit) {
         // Perform one iteration of random sampling task allocation
         uint16_t i = 0;
         for (const std::vector<uint16_t>& scc : AcceptingSCCs) {
             // Perform random sampling for this SCC
-            uint16_t j = 0;
-            for (uint16_t nodeId : scc) {
+            if (Iterations == 0) {
+                // Initialize the start node for this SCC
+                Random_Node* startNode = new Random_Node(0, nba->getNode(scc[0]), std::vector<uint16_t>(1, 0), std::vector<std::vector<uint8_t>>(1, std::vector<uint8_t>(multiRobotSystem->getNumRobots(), 0)), std::vector<uint16_t>(multiRobotSystem->getNumRobots(), 0));
+            }
+            for (uint16_t j = 1; j < scc.size(); j++) {
                 // Access the current node in the SCC using nodeId
-                Node* curNode = nba->getNode(nodeId);
-                Node* newNode = nba->getNode(scc[j+1]);
+                Node* prevNode = nba->getNode(scc[j-1]);
+                Node* curNode = nba->getNode(scc[j]);
                 // Get a random feasible task allocation for the transition from curNode to newNode
-                auto [robotsByAP, satisfiedTrueAPs] = getRandomFeasibleTaskAllocation(curNode, newNode);
+                auto [robotsByAP, satisfiedTrueAPs] = getRandomFeasibleTaskAllocation(prevNode, curNode);
+                //times to goal for each robot (using default time)
+                std::vector<uint16_t> curtimes(multiRobotSystem->getNumRobots(), 0);
 
                 // Perform random sampling for this node in the SCC
                 if (Iterations == 0) {
                     // Initialize the path for this SCC if it's the first iteration
-
-
+                    Random_Node* newRandomNode = new Random_Node(j, curNode, satisfiedTrueAPs, robotsByAP, curtimes);
                 }
+
 
 
             }
@@ -70,7 +77,7 @@ void RandomSamplingTaskAllocation::run() {
 
         // Increment the iteration counter
         Iterations++;
-        computationTime = static_cast<double>(std::clock() - startTime) / CLOCKS_PER_SEC;
+        computationTime = static_cast<double>(clock() - startTime) / CLOCKS_PER_SEC;
     }
 }
 
@@ -100,7 +107,8 @@ void RandomSamplingTaskAllocation::setAcceptingSCCs() {
         return;
     }
     // Create adjacency list for the NBA
-    std::vector<std::vector<int>> adj = createAdjacencyList();
+    std::vector<uint16_t> indexToNodeId;
+    std::vector<std::vector<int>> adj = createAdjacencyList(indexToNodeId);
 
     // Get all SCCs using Tarjan's algorithm
     std::vector<std::vector<int>> allSCCs = getSCCs(adj);
@@ -133,24 +141,24 @@ void RandomSamplingTaskAllocation::setAcceptingSCCs() {
 }
 
 //create adjacency list for the NBA
-std::vector<std::vector<int>> RandomSamplingTaskAllocation::createAdjacencyList() {
+std::vector<std::vector<int>> RandomSamplingTaskAllocation::createAdjacencyList(std::vector<uint16_t>& outIndexToNodeId) {
     const auto& nodeMap = nba->getNodes();
     // Create mapping from node IDs to indices for adjacency list
     std::map<uint16_t, int> nodeIdToIndex;
-    std::vector<uint16_t> indexToNodeId;
+    outIndexToNodeId.clear();
     int idx = 0;
     for (const auto& pair : nodeMap) {
         nodeIdToIndex[pair.first] = idx;
-        indexToNodeId.push_back(pair.first);
+        outIndexToNodeId.push_back(pair.first);
         idx++;
     }
 
-    int n = indexToNodeId.size();
+    int n = outIndexToNodeId.size();
 
     // Build adjacency list from Büchi automaton edges
     std::vector<std::vector<int>> adj(n);
     for (int i = 0; i < n; ++i) {
-        uint16_t nodeId = indexToNodeId[i];
+        uint16_t nodeId = outIndexToNodeId[i];
         Node* node = nba->getNode(nodeId);
         if (node) {
             const auto& edges = node->getEdges();
@@ -178,7 +186,7 @@ std::vector<std::vector<int>> RandomSamplingTaskAllocation::createAdjacencyList(
 //
 std::pair<std::vector<std::vector<uint8_t>>, std::vector<uint16_t>> RandomSamplingTaskAllocation::getRandomFeasibleTaskAllocation(Node* curNode, Node* newNode) {
     //need to get a vector of all possible true ap sets from all the edges to the new node
-    std::vector<std::vector<uint16_t>> trueAPs = buchiPtr->getTrueAPs(curNode->getId(), newNode->getId());
+    std::vector<std::vector<uint16_t>> trueAPs = nba->getTrueAPs(curNode->getId(), newNode->getId());
     bool isFeasible = false;
     std::vector<std::vector<uint8_t>> robotsByAP;
     std::vector<uint16_t> satisfiedApSet;
@@ -188,45 +196,48 @@ std::pair<std::vector<std::vector<uint8_t>>, std::vector<uint16_t>> RandomSampli
         for (const auto& apSet : trueAPs) {
             robotsByAP.clear();
             robotsByAP.resize(apSet.size());
-            
+            //need to get a random allocation of robots for each ap in the set
+            std::vector<std::vector<uint8_t>> randomAllocation = getRandomAllocation(apSet);
             // For each AP in this conjunction, allocate robots to satisfy it
             bool allAPsSatisfied = true;
             for (size_t apIdx = 0; apIdx < apSet.size(); ++apIdx) {
                 uint16_t ap = apSet[apIdx];
-                std::vector<bool> requiredCapabilities = buchiPtr->getLTLFormula()->getRequiredCapabilities(ap);
+                std::vector<bool> requiredCapabilities = nba->getLTLFormula()->getRequiredCapabilities(ap);
+               
+                // Get the robots assigned to this AP
+                std::vector<uint8_t> assignedRobots = randomAllocation[apIdx];
                 
-                // Find robots that can satisfy this AP
-                std::vector<uint8_t> capableRobots;
-                for (uint8_t i = 0; i < multiRobotSystem->getNumRobots(); ++i) {
-                    std::vector<bool> roboCaps = mrsPtr->getRobotCapabilities(i + 1);  // Convert 0-based index to 1-based robot ID
+                // Combine the capabilities of all robots assigned to this AP using OR
+                std::vector<bool> combinedCapabilities(requiredCapabilities.size(), false);
+                for (uint8_t robotId : assignedRobots) {
+                    std::vector<bool> roboCaps = multiRobotSystem->getRobotCapabilities(robotId + 1);  // Convert 0-based index to 1-based robot ID
                     
-                    // Check if this robot's capabilities satisfy required capabilities (superset)
-                    bool canSatisfy = true;
-                    for (size_t j = 0; j < requiredCapabilities.size(); ++j) {
-                        if (requiredCapabilities[j] && (j >= roboCaps.size() || !roboCaps[j])) {
-                            canSatisfy = false;
-                            break;
-                        }
-                    }
-                    if (canSatisfy) {
-                        capableRobots.push_back(i);
+                    // OR the robot's capabilities with the combined capabilities
+                    for (size_t j = 0; j < roboCaps.size() && j < combinedCapabilities.size(); ++j) {
+                        combinedCapabilities[j] = combinedCapabilities[j] || roboCaps[j];
                     }
                 }
                 
-                // If no capable robots found, this AP set cannot be satisfied
-                if (capableRobots.empty()) {
+                // Check if all required capabilities are satisfied by the combined capabilities
+                bool canSatisfy = true;
+                for (size_t j = 0; j < requiredCapabilities.size(); ++j) {
+                    if (requiredCapabilities[j] && (j >= combinedCapabilities.size() || !combinedCapabilities[j])) {
+                        canSatisfy = false;
+                        break;
+                    }
+                }
+                
+                // If this AP cannot be satisfied, the entire set is not feasible
+                if (!canSatisfy) {
                     allAPsSatisfied = false;
                     break;
                 }
-                
-                // Randomly select one robot from capable robots to satisfy this AP
-                uint8_t selectedRobot = capableRobots[std::rand() % capableRobots.size()];
-                robotsByAP[apIdx].push_back(selectedRobot);
             }
             
             // If all APs in this conjunction can be satisfied, this conjunction is feasible
             if (allAPsSatisfied) {
                 satisfiedApSet = apSet;
+                robotsByAP = randomAllocation;
                 isFeasible = true;
                 break;
             }
@@ -234,6 +245,23 @@ std::pair<std::vector<std::vector<uint8_t>>, std::vector<uint16_t>> RandomSampli
     }
     
     return std::make_pair(robotsByAP, satisfiedApSet);
+}
+std::vector<std::vector<uint8_t>> RandomSamplingTaskAllocation::getRandomAllocation(std::vector<uint16_t> apSet) {
+    // Get the number of robots in the system
+    uint8_t numRobots = multiRobotSystem->getNumRobots();
+    
+    // Initialize a vector to hold robot assignments for each AP
+    std::vector<std::vector<uint8_t>> robotsByAP(apSet.size());
+    
+    // Randomly assign each robot to one of the APs
+    for (uint8_t robotId = 0; robotId < numRobots; ++robotId) {
+        // Randomly select an AP for this robot
+        uint16_t randomApIndex = std::rand() % apSet.size();
+        if (std::rand() % 2 == 0) {  // 50% chance to assign this robot to the selected AP
+            robotsByAP[randomApIndex].push_back(robotId);
+        }
+    }
+    return robotsByAP;
 }
 
 //========================
@@ -280,12 +308,12 @@ std::vector<std::vector<uint16_t>> RandomSamplingTaskAllocation::getAcceptingSCC
 // PATHS GETTERS & SETTERS
 //========================
 
-const std::vector<std::vector<Tree_Node*>>& RandomSamplingTaskAllocation::getPaths() const {
-    return path;
+const std::vector<std::vector<Random_Node*>>& RandomSamplingTaskAllocation::getPaths() const {
+    return paths;
 }
 
-void RandomSamplingTaskAllocation::setPaths(const std::vector<std::vector<Tree_Node*>>& paths) {
-    path = paths;
+void RandomSamplingTaskAllocation::setPaths(const std::vector<std::vector<Random_Node*>>& newPaths) {
+    paths = newPaths;
 }
 
 //========================

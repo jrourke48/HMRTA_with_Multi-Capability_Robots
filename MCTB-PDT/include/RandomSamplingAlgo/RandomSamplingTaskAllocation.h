@@ -1,16 +1,23 @@
 #include "Tree/PlanningDecisionTree.h"
 #include "Environment/Environment.h"
 #include "../../Automatons/BuchiAutomaton.h"
-#include "../../Automatons/TarjansAlgorithm.cpp"
 #include "../../Transition_Systems/GeneralTransitionSystem.h"
 #include "MultiRobotSystem/MultiRobotSystem.h"
 #include "MultiRobotSystem/RobotCapabilities.h"
+#include "RandomNode.h"
 #include <vector>
 #include <queue>
+#include <stack>
 #include <set>
 #include <memory>
 #include <string>
 #include <spot/tl/formula.hh>
+
+// Forward declaration for Tarjan's algorithm functions
+// These are defined in TarjansAlgorithm.cpp and compiled via ProductAutomaton.cpp
+std::vector<std::vector<int>> getSCCs(std::vector<std::vector<int>> &adj);
+void findSCC(int u, std::vector<std::vector<int>> &adj, std::vector<int> &disc, std::vector<int> &low,
+             std::vector<bool> &inSt, std::stack<int> &st, int &timer, std::vector<std::vector<int>> &allSCCs);
 
 class RandomSamplingTaskAllocation {
     private:
@@ -28,11 +35,6 @@ class RandomSamplingTaskAllocation {
         double timeLimit; // Time limit for random sampling
         double computationTime; // Time taken for the computation
 
-        //set accepting sccs
-        void setAcceptingSCCs();
-        //get random feasible task allocation - returns (robotsByAP, satisfiedTrueAPs)
-        //robotsByAP[i] = vector of robot indices assigned to satisfy apSet[i]
-        std::pair<std::vector<std::vector<uint8_t>>, std::vector<uint16_t>> getRandomFeasibleTaskAllocation(Node* curNode, Node* newNode);
     public:
         // Constructor with iteration parameter
         RandomSamplingTaskAllocation(BuchiAutomaton* nbaPtr, Environment* envPtr, MultiRobotSystem* robotSysPtr, uint16_t maxIterations);
@@ -59,8 +61,8 @@ class RandomSamplingTaskAllocation {
         // Accepting SCCs getters
         std::vector<std::vector<uint16_t>> getAcceptingSCCs() const;
         // Paths getters and setters
-        const std::vector<std::vector<std::vector<uint16_t>>>& getPaths() const;
-        void setPaths(const std::vector<std::vector<std::vector<uint16_t>>>& paths);
+        const std::vector<std::vector<Random_Node*>>& getPaths() const;
+        void setPaths(const std::vector<std::vector<Random_Node*>>& paths);
         // Optimal makespans getters and setters
         const std::vector<uint16_t>& getOptimalMakespans() const;
         void setOptimalMakespans(const std::vector<uint16_t>& makespans);
@@ -79,4 +81,13 @@ class RandomSamplingTaskAllocation {
         // Computation time getters and setters
         double getComputationTime() const;
         void setComputationTime(double time);
+        
+        //set accepting sccs
+        void setAcceptingSCCs();
+        //create adjacency list for the NBA - helper method for setAcceptingSCCs
+        std::vector<std::vector<int>> createAdjacencyList(std::vector<uint16_t>& outIndexToNodeId);
+        //get random feasible task allocation - returns (robotsByAP, satisfiedTrueAPs)
+        //robotsByAP[i] = vector of robot indices assigned to satisfy apSet[i]
+        std::pair<std::vector<std::vector<uint8_t>>, std::vector<uint16_t>> getRandomFeasibleTaskAllocation(Node* curNode, Node* newNode);
+        std::vector<std::vector<uint8_t>> getRandomAllocation(std::vector<uint16_t> apSet);
 };
