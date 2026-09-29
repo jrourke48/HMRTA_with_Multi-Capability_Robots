@@ -207,8 +207,33 @@ ProductAutomaton::ProductAutomaton(const Environment& env, const MultiRobotSyste
     parseProductFromDot(dotStream.str());
 }
 
-// Returns the optimal accepting path and its cumulative cost in the product automaton using a modified Dijkstra's algorithm.
-// For Product automata: finds path with 2 loops to accepting state, then one additional node.
+// Add an edge's per-robot travel times to each robot's running finish time
+static std::vector<uint32_t> addEdgeTimes(const std::vector<uint32_t>& robotTimes, const Edge& edge) {
+    std::vector<uint32_t> result = robotTimes;
+    std::vector<uint16_t> edgeTimes = edge.getWeight();
+    for (size_t i = 0; i < result.size() && i < edgeTimes.size(); ++i) {
+        result[i] += edgeTimes[i];
+    }
+    return result;
+}
+
+// Makespan is the finish time of the slowest robot
+static uint32_t makespanOf(const std::vector<uint32_t>& robotTimes) {
+    return robotTimes.empty() ? 0 : *std::max_element(robotTimes.begin(), robotTimes.end());
+}
+
+// a dominates b if every robot finishes no later in a than in b
+static bool dominates(const std::vector<uint32_t>& a, const std::vector<uint32_t>& b) {
+    for (size_t i = 0; i < a.size(); ++i) {
+        if (a[i] > b[i]) return false;
+    }
+    return true;
+}
+
+// Returns the optimal accepting path and its makespan in the product automaton.
+// For Product automata: finds path to accepting state, loops back to accepting state, then one additional node.
+// Each robot keeps its own running finish time along the path, so the cost of a path is the latest robot
+// finish time (makespan) rather than the sum of each step's slowest robot.
 std::tuple<std::vector<uint16_t>, uint32_t> ProductAutomaton::OptimalAcceptingPath() {
     // Check if the product automaton has any accepting states
     if (acceptingStates.empty()) {
@@ -221,182 +246,204 @@ std::tuple<std::vector<uint16_t>, uint32_t> ProductAutomaton::OptimalAcceptingPa
         return std::make_tuple(std::vector<uint16_t>(), UINT32_MAX);
     }
 
-    // Map node IDs to indices for distance tracking
+    // Map node IDs to indices for label tracking
     std::map<uint16_t, int> nodeIdToIndex;
     std::vector<uint16_t> indexToNodeId;
     int idx = 0;
+    size_t numRobots = 0;
     for (const auto& pair : nodeMap) {
         nodeIdToIndex[pair.first] = idx;
         indexToNodeId.push_back(pair.first);
         idx++;
+        // Number of robots is the length of the per-robot edge weights
+        if (pair.second) {
+            for (const auto& edge : pair.second->getEdges()) {
+                numRobots = std::max(numRobots, edge.getWeight().size());
+            }
+        }
     }
 
     int numNodes = indexToNodeId.size();
-    
-    // Helper lambda: Dijkstra from a specific start node to find accepting state
-    // If skipStartNode=true, skips the starting node and finds a different accepting state
-    // Returns: (targetIdx, parents, distances)
-    auto dijkstraToAccepting = [&](int startIdx, bool skipStartNode = false) -> std::tuple<int, std::vector<int>, std::vector<uint32_t>> {
-        std::vector<uint32_t> dist(numNodes, UINT32_MAX);
-        std::vector<int> parent(numNodes, -1);
+
+    // A node is on a cycle if its strongly connected component has more than one node or it has a self-loop
+    std::vector<std::vector<int>> adj(numNodes);
+    std::vector<bool> onCycle(numNodes, false);
+    for (int i = 0; i < numNodes; ++i) {
+        Node* node = nodeMap[indexToNodeId[i]];
+        if (!node) continue;
+        for (const auto& edge : node->getEdges()) {
+            if (nodeIdToIndex.find(edge.getDstId()) == nodeIdToIndex.end())
+                continue;
+            int dstIdx = nodeIdToIndex[edge.getDstId()];
+            adj[i].push_back(dstIdx);
+            if (dstIdx == i) onCycle[i] = true;
+        }
+    }
+    for (const auto& scc : getSCCs(adj)) {
+        if (scc.size() > 1) {
+            for (int nodeIdx : scc) onCycle[nodeIdx] = true;
+        }
+    }
+
+    // Step 1 targets: accepting states that can loop back to themselves
+    std::vector<bool> acceptingOnCycle(numNodes, false);
+    for (int i = 0; i < numNodes; ++i) {
+        acceptingOnCycle[i] = onCycle[i] &&
+            std::find(acceptingStates.begin(), acceptingStates.end(), indexToNodeId[i]) != acceptingStates.end();
+    }
+
+    // A label is one way of reaching a node: the node, every robot's finish time, and the label it came from.
+    // Labels from both searches share this vector so the full path can be rebuilt by following parents.
+    struct Label {
+        int nodeIdx;
+        std::vector<uint32_t> robotTimes;
+        int parent;
+        bool alive;  // false once another label at the same node dominates it
+    };
+    std::vector<Label> labels;
+
+    // Helper lambda: label-setting search from rootLabel to the target node with the lowest makespan.
+    // Each node keeps every label whose robot times are not dominated by another label at that node,
+    // because a label with a higher makespan now may still finish sooner if its slow robot is done working.
+    // Labels are expanded in order of makespan, and makespan never decreases along a path,
+    // so the first target label popped has the lowest makespan.
+    // If skipStartNode=true, at least one transition is taken before a target counts,
+    // so the start node itself only counts if it is reached again through a cycle.
+    // Returns: index of the target label found, or -1
+    auto searchToTarget = [&](int rootLabel, bool skipStartNode, const std::vector<bool>& isTarget) -> int {
+        std::vector<std::vector<int>> nodeLabels(numNodes);
         std::priority_queue<std::pair<uint32_t, int>, std::vector<std::pair<uint32_t, int>>, std::greater<>> pq;
 
-        dist[startIdx] = 0;
-        pq.push({0, startIdx});
-
-        int targetIdx = -1;
-        bool firstIteration = true;
+        // When skipping, the root is not registered at its node, so a cycle back to it is not
+        // rejected as dominated by the root's earlier times
+        if (!skipStartNode) {
+            nodeLabels[labels[rootLabel].nodeIdx].push_back(rootLabel);
+        }
+        pq.push({makespanOf(labels[rootLabel].robotTimes), rootLabel});
 
         while (!pq.empty()) {
-            auto [currDist, currIdx] = pq.top();
+            auto [currMakespan, currLabel] = pq.top();
             pq.pop();
 
-            if (currDist > dist[currIdx])
+            if (!labels[currLabel].alive)
                 continue;
 
-            // Check if current node is accepting (but skip start node if requested)
-            uint16_t currNodeId = indexToNodeId[currIdx];
-            if (!firstIteration || !skipStartNode) {  // Allow start node on first iteration only if skipStartNode=false
-                if (std::find(acceptingStates.begin(), acceptingStates.end(), currNodeId) != acceptingStates.end()) {
-                    targetIdx = currIdx;
-                    break;  // Found accepting state
-                }
+            // Check if current node is a target
+            int currIdx = labels[currLabel].nodeIdx;
+            if (!(skipStartNode && currLabel == rootLabel) && isTarget[currIdx]) {
+                return currLabel;  // Found target
             }
-            firstIteration = false;
 
             // Explore neighbors
-            Node* currNode = nodeMap[currNodeId];
-            if (currNode) {
-                for (const auto& edge : currNode->getEdges()) {
-                    uint16_t neighborNodeId = edge.getDstId();
-                    if (nodeIdToIndex.find(neighborNodeId) == nodeIdToIndex.end())
-                        continue;
+            Node* currNode = nodeMap[indexToNodeId[currIdx]];
+            if (!currNode) continue;
+            for (const auto& edge : currNode->getEdges()) {
+                if (nodeIdToIndex.find(edge.getDstId()) == nodeIdToIndex.end())
+                    continue;
+                int neighborIdx = nodeIdToIndex[edge.getDstId()];
+                std::vector<uint32_t> newTimes = addEdgeTimes(labels[currLabel].robotTimes, edge);
 
-                    int neighborIdx = nodeIdToIndex[neighborNodeId];
-                    uint32_t edgeWeight = edge.getWeight();
-
-                    if (dist[currIdx] != UINT32_MAX && dist[currIdx] + edgeWeight < dist[neighborIdx]) {
-                        dist[neighborIdx] = dist[currIdx] + edgeWeight;
-                        parent[neighborIdx] = currIdx;
-                        pq.push({dist[neighborIdx], neighborIdx});
+                // Skip if an existing label at the neighbor is at least as good for every robot
+                bool isDominated = false;
+                for (int other : nodeLabels[neighborIdx]) {
+                    if (dominates(labels[other].robotTimes, newTimes)) {
+                        isDominated = true;
+                        break;
                     }
                 }
-            }
-        }
+                if (isDominated) continue;
 
-        return {targetIdx, parent, dist};
-    };
+                // Remove existing labels at the neighbor that the new label beats for every robot
+                auto& existing = nodeLabels[neighborIdx];
+                existing.erase(std::remove_if(existing.begin(), existing.end(), [&](int other) {
+                    if (dominates(newTimes, labels[other].robotTimes)) {
+                        labels[other].alive = false;
+                        return true;
+                    }
+                    return false;
+                }), existing.end());
 
-    // Helper lambda: get next node from current
-    auto getNextNode = [&](int currIdx) -> int {
-        Node* currNode = nodeMap[indexToNodeId[currIdx]];
-        if (currNode && !currNode->getEdges().empty()) {
-            uint16_t nextNodeId = currNode->getEdges()[0].getDstId();
-            if (nodeIdToIndex.find(nextNodeId) != nodeIdToIndex.end()) {
-                return nodeIdToIndex[nextNodeId];
+                labels.push_back({neighborIdx, newTimes, currLabel, true});
+                int newLabel = labels.size() - 1;
+                existing.push_back(newLabel);
+                pq.push({makespanOf(newTimes), newLabel});
             }
         }
         return -1;
     };
 
-    // Step 1: Find path from initial state (0) to first accepting state
-    auto [firstAcceptingIdx, parent1, dist1] = dijkstraToAccepting(nodeIdToIndex[0], false);
-    if (firstAcceptingIdx == -1) {
+    // Step 1: Find path from initial state (0) to the first accepting state that lies on a cycle
+    // Take at least one transition so an accepting initial state still gets a full loop
+    int startIdx = nodeIdToIndex[0];
+    labels.push_back({startIdx, std::vector<uint32_t>(numRobots, 0), -1, true});
+    int firstAcceptingLabel = searchToTarget(0, true, acceptingOnCycle);
+    if (firstAcceptingLabel == -1) {
         std::cerr << "No path to accepting state found!" << std::endl;
         return std::make_tuple(std::vector<uint16_t>(), UINT32_MAX);
     }
 
-    // Step 2: Find path from first accepting state to second accepting state (first loop)
-    // Skip the first accepting state itself, find a different accepting state
-    auto [secondAcceptingIdx, parent2, dist2] = dijkstraToAccepting(firstAcceptingIdx, true);
-    if (secondAcceptingIdx == -1) {
+    // Step 2: Find the cycle from the first accepting state back to that same accepting state,
+    // continuing from the robot times at the end of step 1
+    std::vector<bool> loopTarget(numNodes, false);
+    loopTarget[labels[firstAcceptingLabel].nodeIdx] = true;
+    int secondAcceptingLabel = searchToTarget(firstAcceptingLabel, true, loopTarget);
+    if (secondAcceptingLabel == -1) {
         std::cerr << "No path to second accepting state found!" << std::endl;
         return std::make_tuple(std::vector<uint16_t>(), UINT32_MAX);
     }
 
-    // Step 3: Find path from second accepting state to third accepting state (second loop)
-    // Skip the second accepting state itself, find a different accepting state
-    auto [thirdAcceptingIdx, parent3, dist3] = dijkstraToAccepting(secondAcceptingIdx, true);
-    if (thirdAcceptingIdx == -1) {
-        std::cerr << "No path to third accepting state found!" << std::endl;
-        return std::make_tuple(std::vector<uint16_t>(), UINT32_MAX);
-    }
-
-    // Step 4: Get one additional node from third accepting state
-    int additionalNodeIdx = getNextNode(thirdAcceptingIdx);
-
-    // Reconstruct full path with weights: initial → first accepting → second accepting → third accepting → +1 node
-    std::vector<uint16_t> result;
-    std::vector<uint32_t> edgeWeights;  // weights between consecutive nodes
-
-    // Path to first accepting state
-    std::vector<int> segment1Path;
-    int current = firstAcceptingIdx;
-    while (current != -1) {
-        segment1Path.insert(segment1Path.begin(), current);
-        current = parent1[current];
-    }
-    for (int idx : segment1Path) {
-        result.push_back(indexToNodeId[idx]);
-    }
-
-    // Path from first to second accepting state (skip first node to avoid duplication)
-    std::vector<int> segment2Path;
-    current = secondAcceptingIdx;
-    while (current != -1 && current != firstAcceptingIdx) {
-        segment2Path.insert(segment2Path.begin(), current);
-        current = parent2[current];
-    }
-    for (int idx : segment2Path) {
-        result.push_back(indexToNodeId[idx]);
-    }
-
-    // Path from second to third accepting state (skip first node to avoid duplication)
-    std::vector<int> segment3Path;
-    current = thirdAcceptingIdx;
-    while (current != -1 && current != secondAcceptingIdx) {
-        segment3Path.insert(segment3Path.begin(), current);
-        current = parent3[current];
-    }
-    for (int idx : segment3Path) {
-        result.push_back(indexToNodeId[idx]);
-    }
-
-    // Add one additional node if found
-    if (additionalNodeIdx != -1) {
-        result.push_back(indexToNodeId[additionalNodeIdx]);
-    }
-
-    // Calculate edge weights
-    std::vector<uint32_t> weights;
-    for (size_t i = 0; i < result.size() - 1; ++i) {
-        uint16_t srcNodeId = result[i];
-        uint16_t dstNodeId = result[i + 1];
-        
-        Node* srcNode = nodeMap[srcNodeId];
-        uint32_t weight = 0;
-        
-        if (srcNode) {
-            for (const auto& edge : srcNode->getEdges()) {
-                if (edge.getDstId() == dstNodeId) {
-                    weight = edge.getWeight();
-                    break;
-                }
+    // Step 3: Get one additional node from second accepting state, the one with the lowest resulting makespan
+    int finalLabel = secondAcceptingLabel;
+    Node* secondNode = nodeMap[indexToNodeId[labels[secondAcceptingLabel].nodeIdx]];
+    if (secondNode) {
+        uint32_t bestMakespan = UINT32_MAX;
+        int bestNeighborIdx = -1;
+        std::vector<uint32_t> bestTimes;
+        for (const auto& edge : secondNode->getEdges()) {
+            if (nodeIdToIndex.find(edge.getDstId()) == nodeIdToIndex.end())
+                continue;
+            std::vector<uint32_t> newTimes = addEdgeTimes(labels[secondAcceptingLabel].robotTimes, edge);
+            if (makespanOf(newTimes) < bestMakespan) {
+                bestMakespan = makespanOf(newTimes);
+                bestNeighborIdx = nodeIdToIndex[edge.getDstId()];
+                bestTimes = newTimes;
             }
         }
-        weights.push_back(weight);
+        if (bestNeighborIdx != -1) {
+            labels.push_back({bestNeighborIdx, bestTimes, secondAcceptingLabel, true});
+            finalLabel = labels.size() - 1;
+        }
     }
 
-    // Output path with weights
-    std::cout << "\nOptimal Accepting Path (with edge weights):" << std::endl;
-    std::cout << "  Accepting states found: " << indexToNodeId[firstAcceptingIdx] 
-              << ", " << indexToNodeId[secondAcceptingIdx] 
-              << ", " << indexToNodeId[thirdAcceptingIdx] << std::endl;
+    // Reconstruct full path: initial → first accepting → around the cycle back to it → +1 node
+    std::vector<int> pathLabels;
+    for (int current = finalLabel; current != -1; current = labels[current].parent) {
+        pathLabels.push_back(current);
+    }
+    std::reverse(pathLabels.begin(), pathLabels.end());
+
+    std::vector<uint16_t> result;
+    for (int label : pathLabels) {
+        result.push_back(indexToNodeId[labels[label].nodeIdx]);
+    }
+
+    // Output path with the slowest robot's time for each step
+    std::cout << "\nOptimal Accepting Path (with slowest robot time per step):" << std::endl;
+    std::cout << "  Accepting states found: " << indexToNodeId[labels[firstAcceptingLabel].nodeIdx]
+              << ", " << indexToNodeId[labels[secondAcceptingLabel].nodeIdx] << std::endl;
     std::cout << "  Path: ";
-    for (size_t i = 0; i < result.size(); ++i) {
-        if (i > 0) std::cout << " -(" << weights[i-1] << ")-> ";
+    for (size_t i = 0; i < pathLabels.size(); ++i) {
+        if (i > 0) {
+            const auto& prevTimes = labels[pathLabels[i - 1]].robotTimes;
+            const auto& currTimes = labels[pathLabels[i]].robotTimes;
+            uint32_t stepTime = 0;
+            for (size_t r = 0; r < currTimes.size(); ++r) {
+                stepTime = std::max(stepTime, currTimes[r] - prevTimes[r]);
+            }
+            std::cout << " -(" << stepTime << ")-> ";
+        }
         std::cout << result[i];
-        
+
         // Also show product states (robot positions)
         Node* node = nodeMap[result[i]];
         if (node) {
@@ -410,12 +457,18 @@ std::tuple<std::vector<uint16_t>, uint32_t> ProductAutomaton::OptimalAcceptingPa
         }
     }
     std::cout << std::endl;
-    
-    uint32_t totalWeight = 0;
-    for (uint32_t w : weights) totalWeight += w;
-    std::cout << "  Total weight: " << totalWeight << std::endl;
 
-    return std::make_tuple(result, totalWeight);
+    const auto& finalTimes = labels[finalLabel].robotTimes;
+    std::cout << "  Robot finish times: [";
+    for (size_t r = 0; r < finalTimes.size(); ++r) {
+        if (r > 0) std::cout << ",";
+        std::cout << finalTimes[r];
+    }
+    std::cout << "]" << std::endl;
+    uint32_t makespan = makespanOf(finalTimes);
+    std::cout << "  Makespan: " << makespan << std::endl;
+
+    return std::make_tuple(result, makespan);
 }
 
 
@@ -818,30 +871,31 @@ void ProductAutomaton::initCartesianStateMapping(std::vector<std::vector<uint16_
         stateMapping[productState] = label;
     }
 }
-uint32_t ProductAutomaton::getEdgeWeight(Node* srcNode, Node* dstNode) const {
+std::vector<uint16_t> ProductAutomaton::getEdgeWeight(Node* srcNode, Node* dstNode) const {
     // Defensive checks
     if (srcNode == nullptr || dstNode == nullptr) {
         std::cerr << "ERROR: getEdgeWeight called with null node!" << std::endl;
-        return 0;
+        return {0};
     }
     
     // MUST use member variables - env and mrs must be valid at this point
     if (envPtr == nullptr || mrsPtr == nullptr) {
         std::cerr << "ERROR: Environment or MultiRobotSystem pointers are null in getEdgeWeight!" << std::endl;
-        return 0;
+        return {0};
     }
     
-    uint16_t maxtime = 0;
-    
+    // One travel time per robot, robots that do not move stay at 0
+    std::vector<uint16_t> times(mrsPtr->getNumRobots(), 0);
+
     try {
         std::vector<uint16_t> srcProductStates = srcNode->getProductStates().second;
         std::vector<uint16_t> dstProductStates = dstNode->getProductStates().second;
-        
-        // If product states are empty, return 0 (no weight can be computed)
+
+        // If product states are empty, return all zeros (no weight can be computed)
         if (srcProductStates.empty() || dstProductStates.empty()) {
-            return 0;
+            return times;
         }
-        
+
         for (size_t i = 0; i < srcProductStates.size(); ++i) {
             uint16_t srcState = srcProductStates[i];
             uint16_t dstState = (i < dstProductStates.size()) ? dstProductStates[i] : srcState;
@@ -862,22 +916,18 @@ uint32_t ProductAutomaton::getEdgeWeight(Node* srcNode, Node* dstNode) const {
                 auto srcGridCenter = envPtr->TSStateIdToGridCenter(srcState);
                 auto dstGridCenter = envPtr->TSStateIdToGridCenter(dstState);
                 
-                uint16_t weight = robot->getTravelTime(srcGridCenter, dstGridCenter);
-                
-                if (weight > maxtime) {
-                    maxtime = weight;
-                }
+                times[i] = robot->getTravelTime(srcGridCenter, dstGridCenter);
             }
         }
     } catch (const std::exception& e_ex) {
         std::cerr << "ERROR in getEdgeWeight: " << e_ex.what() << std::endl;
-        return 0;
+        return std::vector<uint16_t>(mrsPtr->getNumRobots(), 0);
     } catch (...) {
         std::cerr << "ERROR in getEdgeWeight: Unknown exception!" << std::endl;
-        return 0;
+        return std::vector<uint16_t>(mrsPtr->getNumRobots(), 0);
     }
-    
-    return maxtime;
+
+    return times;
 }
 
 

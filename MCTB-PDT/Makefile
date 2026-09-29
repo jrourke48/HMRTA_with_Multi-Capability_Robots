@@ -23,6 +23,7 @@ NUMBER_ROBOTS_BIN = $(OUT_DIR)/NumberRobotsTest
 TS_REGIONS_BIN = $(OUT_DIR)/TransitionSystemRegionsTest
 AVG_CAPS_BIN = $(OUT_DIR)/AverageCapabilitiesTest
 ROBOT_HOMOGENEITY_BIN = $(OUT_DIR)/RobotHomogeneityTest
+SAMPLING_TASK_ALLOC_BIN = $(OUT_DIR)/TestSamplingTaskAllocation
 
 # Source files
 TEST_SRC = apps/TestIntegration.cpp
@@ -40,10 +41,13 @@ NUMBER_ROBOTS_SRC = organizedtests/number_robots/test_number_robots.cpp
 TS_REGIONS_SRC = organizedtests/transition_system_regions/test_transition_system_regions.cpp
 AVG_CAPS_SRC = organizedtests/average_capabilities/test_average_capabilities.cpp
 ROBOT_HOMOGENEITY_SRC = organizedtests/robot_homogeneity/test_robot_homogeneity.cpp
+SAMPLING_TASK_ALLOC_SRC = apps/TestingSamplingTaskAllocation.cpp
 # GridVis - only included in visualization targets
 GRIDVIS_SRC = src/Environment/gridvis.cpp
 # TaskAllocationAlgorithms - algorithms for task allocation
 TASK_ALLOC_SRCS = src/TaskAllocationAlgorithms.cpp
+# RandomSamplingTaskAllocation - random sampling algorithm implementation
+SAMPLING_TASK_ALLOC_IMPL_SRCS = src/RandomSamplingTaskAllocation.cpp src/RandomSamplingAlgo/RandomNode.cpp
 
 COMMON_SRCS = \
 	src/Environment/Point.cpp \
@@ -79,15 +83,17 @@ NUMBER_ROBOTS_OBJ = $(NUMBER_ROBOTS_SRC:.cpp=.o)
 TS_REGIONS_OBJ = $(TS_REGIONS_SRC:.cpp=.o)
 AVG_CAPS_OBJ = $(AVG_CAPS_SRC:.cpp=.o)
 ROBOT_HOMOGENEITY_OBJ = $(ROBOT_HOMOGENEITY_SRC:.cpp=.o)
+SAMPLING_TASK_ALLOC_OBJ = $(SAMPLING_TASK_ALLOC_SRC:.cpp=.o)
+SAMPLING_TASK_ALLOC_IMPL_OBJS = $(SAMPLING_TASK_ALLOC_IMPL_SRCS:.cpp=.o)
 GRIDVIS_OBJ = $(GRIDVIS_SRC:.cpp=.o)
 COMMON_OBJS = $(COMMON_SRCS:.cpp=.o)
 TASK_ALLOC_OBJS = $(TASK_ALLOC_SRCS:.cpp=.o)
-ALL_OBJS = $(TEST_OBJ) $(TREE_TEST_OBJ) $(TASK_ALLOC_OBJ) $(PLANNING_TREE_TEST_OBJ) $(OPTIMAL_PATH_OBJ) $(DSTAR_OBJ) $(VIS_OBJ) $(INTERTASK_OBJ) $(MULTICAP_OBJ) $(AUTOMATON_STATES_OBJ) $(AUTOMATON_STATES_BATCH_OBJ) $(NUMBER_ROBOTS_OBJ) $(TS_REGIONS_OBJ) $(AVG_CAPS_OBJ) $(ROBOT_HOMOGENEITY_OBJ) $(GRIDVIS_OBJ) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
+ALL_OBJS = $(TEST_OBJ) $(TREE_TEST_OBJ) $(TASK_ALLOC_OBJ) $(PLANNING_TREE_TEST_OBJ) $(OPTIMAL_PATH_OBJ) $(DSTAR_OBJ) $(VIS_OBJ) $(INTERTASK_OBJ) $(MULTICAP_OBJ) $(AUTOMATON_STATES_OBJ) $(AUTOMATON_STATES_BATCH_OBJ) $(NUMBER_ROBOTS_OBJ) $(TS_REGIONS_OBJ) $(AVG_CAPS_OBJ) $(ROBOT_HOMOGENEITY_OBJ) $(SAMPLING_TASK_ALLOC_OBJ) $(SAMPLING_TASK_ALLOC_IMPL_OBJS) $(GRIDVIS_OBJ) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
 
 # Targets
-.PHONY: all clean run rebuild help test test-tree test-task test-planning-tree test-optimal-path test-dstar test-intertask test-multicap test-automaton-states test-automaton-states-batch test-number-robots test-ts-regions test-average-capabilities test-robot-homogeneity test-all tree-only task-only planning-tree-only optimal-path-only dstar-only intertask-only multicap-only automaton-states-only automaton-states-batch-only number-robots-only ts-regions-only average-capabilities-only robot-homogeneity-only vis vis-only
+.PHONY: all clean run rebuild help test test-tree test-task test-planning-tree test-optimal-path test-dstar test-intertask test-multicap test-automaton-states test-automaton-states-batch test-number-robots test-ts-regions test-average-capabilities test-robot-homogeneity test-sampling-task-alloc test-all tree-only task-only planning-tree-only optimal-path-only dstar-only intertask-only multicap-only automaton-states-only automaton-states-batch-only number-robots-only ts-regions-only average-capabilities-only robot-homogeneity-only sampling-task-alloc-only vis vis-only
 
-all: $(OUT_BIN) $(TREE_BIN) $(TASK_ALLOC_BIN) $(PLANNING_TREE_BIN) $(OPTIMAL_PATH_BIN) $(DSTAR_BIN) $(INTERTASK_BIN) $(MULTICAP_BIN) $(AUTOMATON_STATES_BIN) $(AUTOMATON_STATES_BATCH_BIN) $(NUMBER_ROBOTS_BIN) $(TS_REGIONS_BIN) $(AVG_CAPS_BIN) $(ROBOT_HOMOGENEITY_BIN) $(VIS_BIN)
+all: $(OUT_BIN) $(TREE_BIN) $(TASK_ALLOC_BIN) $(PLANNING_TREE_BIN) $(OPTIMAL_PATH_BIN) $(DSTAR_BIN) $(INTERTASK_BIN) $(MULTICAP_BIN) $(AUTOMATON_STATES_BIN) $(AUTOMATON_STATES_BATCH_BIN) $(NUMBER_ROBOTS_BIN) $(TS_REGIONS_BIN) $(AVG_CAPS_BIN) $(ROBOT_HOMOGENEITY_BIN) $(SAMPLING_TASK_ALLOC_BIN) $(VIS_BIN)
 
 # Build the test executable
 $(OUT_BIN): $(TEST_OBJ) $(COMMON_OBJS)
@@ -173,6 +179,12 @@ $(ROBOT_HOMOGENEITY_BIN): $(ROBOT_HOMOGENEITY_OBJ) $(COMMON_OBJS) $(TASK_ALLOC_O
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $^ -o $@ $(LIBS)
 	@echo "✓ Build successful: $(ROBOT_HOMOGENEITY_BIN)"
 
+# Build the sampling task allocation tests executable
+$(SAMPLING_TASK_ALLOC_BIN): $(SAMPLING_TASK_ALLOC_OBJ) $(SAMPLING_TASK_ALLOC_IMPL_OBJS) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
+	@mkdir -p $(OUT_DIR)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $^ -o $@ $(LIBS)
+	@echo "✓ Build successful: $(SAMPLING_TASK_ALLOC_BIN)"
+
 # Build the visualization executable
 $(VIS_BIN): $(VIS_OBJ) $(GRIDVIS_OBJ) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
 	@mkdir -p $(OUT_DIR)
@@ -253,6 +265,11 @@ test-robot-homogeneity: $(ROBOT_HOMOGENEITY_BIN)
 	@echo "Running robot homogeneity scaling tests..."
 	@cd organizedtests/robot_homogeneity && ../../$(ROBOT_HOMOGENEITY_BIN)
 
+# Run sampling task allocation tests
+test-sampling-task-alloc: $(SAMPLING_TASK_ALLOC_BIN)
+	@echo "Running sampling task allocation tests..."
+	@$(SAMPLING_TASK_ALLOC_BIN)
+
 # Shortcut to run only tree tests
 tree-only: test-tree
 
@@ -291,6 +308,9 @@ average-capabilities-only: test-average-capabilities
 
 # Shortcut to run only robot homogeneity tests
 robot-homogeneity-only: test-robot-homogeneity
+
+# Shortcut to run only sampling task allocation tests
+sampling-task-alloc-only: test-sampling-task-alloc
 
 # Run visualization
 vis: $(VIS_BIN)

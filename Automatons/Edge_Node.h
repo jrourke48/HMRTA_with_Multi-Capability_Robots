@@ -17,15 +17,15 @@ private:
     //true atomic proposition ids for the edge. The outer vector represents 
     //the OR clauses and the inner vector represents the AND clauses
     // For weighted edges, we can add a weight property
-    uint32_t weight;
+    std::vector<uint16_t> weight;
 public:
     // Constructors
     Edge() = default;
-    Edge(uint16_t dstId) : dstId(dstId), weight(1) {}
-    Edge(uint16_t dstId, uint32_t weight) : dstId(dstId), weight(weight) {}
-    Edge(uint16_t dstId, const std::string& label) : dstId(dstId), label(label), weight(1) {}
-    Edge(uint16_t dstId, const std::string& label, uint32_t weight = 1) : dstId(dstId), label(label), weight(weight) {}
-    Edge(uint16_t dstId, const std::string& label, bool settrueAPs, uint32_t weight = 1) 
+    Edge(uint16_t dstId) : dstId(dstId), weight{1} {}
+    Edge(uint16_t dstId, const std::vector<uint16_t>& weight) : dstId(dstId), weight(weight) {}
+    Edge(uint16_t dstId, const std::string& label) : dstId(dstId), label(label), weight{1} {}
+    Edge(uint16_t dstId, const std::string& label, const std::vector<uint16_t>& weight) : dstId(dstId), label(label), weight(weight) {}
+    Edge(uint16_t dstId, const std::string& label, bool settrueAPs, const std::vector<uint16_t>& weight = {1})
         : dstId(dstId), label(label), weight(weight) {
         if (settrueAPs) {
             this->trueAPs = parseEdgeLabelToVector(label);
@@ -36,7 +36,7 @@ public:
     
     //getters and setters
     uint16_t getDstId() const { return dstId; };
-    uint32_t getWeight() const { return weight; };
+    std::vector<uint16_t> getWeight() const { return weight; };
     std::string getLabel() const { return label; };
     std::vector<std::vector<uint16_t>> getTrueAPs() const { return trueAPs; };
     void setTrueAPs() {
@@ -104,7 +104,7 @@ public:
 
     
         void setDstId(uint16_t id) { dstId = id; };
-        void setWeight(uint32_t w) { weight = w; };
+        void setWeight(const std::vector<uint16_t>& w) { weight = w; };
         void setLabel(const std::string& label) { this->label = label; };
     };
 
@@ -167,6 +167,10 @@ public:
         //add an edge to this node
         void addEdge(const Edge& edge) { edges.push_back(edge);
             numEdges++;
+        };
+        //replace all outgoing edges of this node
+        void setEdges(const std::vector<Edge>& newEdges) { edges = newEdges;
+            numEdges = edges.size();
         };
         //check if there is a direct edge to a given destination node
         bool isAdjacent(uint16_t dstId) const {

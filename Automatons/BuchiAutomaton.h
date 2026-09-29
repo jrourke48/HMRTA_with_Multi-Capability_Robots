@@ -227,7 +227,7 @@ public:
                     unsigned dst = dstLabelPair.first;
                     std::string label = dstLabelPair.second;
                     // Create edge with label and add to source node
-                    Edge e(dst, label, true, 1);
+                    Edge e(dst, label, true, {1});
                     srcNode->addEdge(e);
                     numEdges++;
                 }
