@@ -63,7 +63,8 @@ public:
     std::string replaceLabel(const std::string& oldLabel, const std::string& additionalLabel);
     // Getter for Spot automaton
     spot::twa_graph_ptr getSpotAutomaton() const { return spotAutomaton; }
-    uint32_t getEdgeWeight(Node* srcNode, Node* dstNode) const;
+    // Per-robot travel times for the transition (index i = robot i, 0 if the robot does not move)
+    std::vector<uint16_t> getEdgeWeight(Node* srcNode, Node* dstNode) const;
     // Getter for Buchi automaton
     const BuchiAutomaton* getBuchiAutomaton() const { return buchiPtr; }
 };

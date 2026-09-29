@@ -9,27 +9,28 @@
 #include <queue>
 #include <stack>
 #include <set>
+#include <map>
 #include <memory>
 #include <string>
 #include <spot/tl/formula.hh>
 
-// Forward declaration for Tarjan's algorithm functions
-// These are defined in TarjansAlgorithm.cpp and compiled via ProductAutomaton.cpp
-std::vector<std::vector<int>> getSCCs(std::vector<std::vector<int>> &adj);
-void findSCC(int u, std::vector<std::vector<int>> &adj, std::vector<int> &disc, std::vector<int> &low,
-             std::vector<bool> &inSt, std::stack<int> &st, int &timer, std::vector<std::vector<int>> &allSCCs);
-
 class RandomSamplingTaskAllocation {
+    public:
+        struct TaskAllocPath{
+            uint16_t pathLength;
+            std::vector<Random_Node*> path;
+            uint16_t makespan;
+        };
+
     private:
         BuchiAutomaton* nba;
         Environment* environment;
         MultiRobotSystem* multiRobotSystem;
-        std::vector<std::vector<uint16_t>> AcceptingSCCs; // Strongly connected components of the accepting states in the NBA
-        std::vector<std::vector<Random_Node*>> paths; //optimal allocation paths for each SCC in the NBA
-        std::vector<uint16_t> optimalMakespans; //optimal makespans for each sccs
-        std::vector<uint16_t> optimalSCC; //optimal paths 
-        uint16_t optimalMakespan; //optimal makespan for the optimal SCC
-        uint16_t numSCCs; // Number of strongly connected components in the NBA
+        std::map<uint16_t, std::pair<TaskAllocPath, TaskAllocPath>> paths; //accepting state -> pair of task allocation paths (prefix,suffix)
+        std::vector<Random_Node*> optimalPath; //optimal path
+        uint16_t optimalMakespan; //optimal makespan for the optimal path
+        uint16_t numNBAStates; // Number of states in the NBA
+        BuchiAutomaton* prunedNBA; // Copy of NBA with infeasible edges removed
         uint16_t maxIterations; // Maximum number of iterations for random sampling
         uint16_t Iterations; // Number of iterations for random sampling
         double timeLimit; // Time limit for random sampling
@@ -44,8 +45,21 @@ class RandomSamplingTaskAllocation {
         // Destructor
         ~RandomSamplingTaskAllocation();
 
+        //trim infeasible edges from the buchi to make sure that all edges are feasible during search This needs work
+        void pruneInfeasibleNBAPaths();
+
         //run the random sampling task allocation algorithm
         void run();
+        //helper for run for finite and infinite automata BOTH need work 
+        void runFinitePathPlanner();
+        void runInfinitePathPlanner();
+
+        //Uses DFS to get minimum length path to Goal This needs work
+        TaskAllocPath getMinLengthPath(Node* srcNode, Node* goalNode);
+
+        //Incrementally build a random path (or cycle if srcNode == goalNode) of at most targetLength nodes
+        //returns an empty path if the goal is not reached or the makespan exceeds makespanBound
+        TaskAllocPath buildRandomPath(BuchiAutomaton* searchNBA, Node* srcNode, Node* goalNode, uint16_t targetLength, bool hasBound, uint16_t makespanBound);
 
         //========================
         // SETTERS AND GETTERS
@@ -56,19 +70,30 @@ class RandomSamplingTaskAllocation {
         void setMultiRobotSystem(MultiRobotSystem* robotSysPtr);
         // System component getters
         BuchiAutomaton* getNBA() const;
+        BuchiAutomaton* getPrunedNBA() const;
         Environment* getEnvironment() const;
         MultiRobotSystem* getMultiRobotSystem() const;
-        // Accepting SCCs getters
-        std::vector<std::vector<uint16_t>> getAcceptingSCCs() const;
-        // Paths getters and setters
-        const std::vector<std::vector<Random_Node*>>& getPaths() const;
-        void setPaths(const std::vector<std::vector<Random_Node*>>& paths);
-        // Optimal makespans getters and setters
-        const std::vector<uint16_t>& getOptimalMakespans() const;
-        void setOptimalMakespans(const std::vector<uint16_t>& makespans);
-        // Number of SCCs getters and setters
-        uint16_t getNumSCCs() const;
-        void setNumSCCs(uint16_t num);
+        // Paths getters and adders
+        // get the (prefix, suffix) paths for a specific accepting state
+        const std::pair<TaskAllocPath, TaskAllocPath>& getPath(uint16_t acceptingState) const;
+        // get the entire map of paths for all accepting states
+        const std::map<uint16_t, std::pair<TaskAllocPath, TaskAllocPath>>& getAllPaths() const;
+        // Add a new path for a specific accepting state 
+        void addPath(uint16_t acceptingState, TaskAllocPath prePath, TaskAllocPath sufPath);
+        //add a new path for an accepting state that is the initial state meaning no prefix needed
+        void addNoPrePath(uint16_t acceptingState, TaskAllocPath sufPath);
+        //add a new path for a finite NBA meaning no suffix is needed
+        void addNoSufPath(uint16_t acceptingState, TaskAllocPath prePath);
+
+        // Optimal path getters and setters
+        const std::vector<Random_Node*>& getOptimalPath() const;
+        void setOptimalPath(const std::vector<Random_Node*>& path);
+        // Optimal makespan getters and setters
+        uint16_t getOptimalMakespan() const;
+        void setOptimalMakespan(uint16_t makespan);
+        // Number of NBA states getters and setters
+        uint16_t getNumNBAStates() const;
+        void setNumNBAStates(uint16_t num);
         // Max iterations getters and setters
         uint16_t getMaxIterations() const;
         void setMaxIterations(uint16_t maxIter);
@@ -81,11 +106,7 @@ class RandomSamplingTaskAllocation {
         // Computation time getters and setters
         double getComputationTime() const;
         void setComputationTime(double time);
-        
-        //set accepting sccs
-        void setAcceptingSCCs();
-        //create adjacency list for the NBA - helper method for setAcceptingSCCs
-        std::vector<std::vector<int>> createAdjacencyList(std::vector<uint16_t>& outIndexToNodeId);
+
         //get random feasible task allocation - returns (robotsByAP, satisfiedTrueAPs)
         //robotsByAP[i] = vector of robot indices assigned to satisfy apSet[i]
         std::pair<std::vector<std::vector<uint8_t>>, std::vector<uint16_t>> getRandomFeasibleTaskAllocation(Node* curNode, Node* newNode);
