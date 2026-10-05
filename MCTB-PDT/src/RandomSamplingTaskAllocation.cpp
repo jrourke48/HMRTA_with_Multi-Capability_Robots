@@ -8,7 +8,14 @@
 // CONSTRUCTORS & DESTRUCTOR
 //========================
 
-// Constructor with iteration parameter
+/**
+ * @brief Construct a planner bounded by a number of sampling iterations.
+ * @param nbaPtr        Buchi automaton for the specification; not owned.
+ * @param envPtr        Environment supplying region geometry; not owned.
+ * @param robotSysPtr   Robot team; not owned.
+ * @param maxIterations Iterations to sample before stopping.
+ * @note The time limit is left unset, so only the iteration count bounds the search.
+ */
 RandomSamplingTaskAllocation::RandomSamplingTaskAllocation(
     BuchiAutomaton* nbaPtr, 
     Environment* envPtr, 
@@ -28,7 +35,14 @@ RandomSamplingTaskAllocation::RandomSamplingTaskAllocation(
       computationTime(0.0) {
 }
 
-// Constructor with timelimit parameter
+/**
+ * @brief Construct a planner bounded by a wall clock budget.
+ * @param nbaPtr      Buchi automaton for the specification; not owned.
+ * @param envPtr      Environment supplying region geometry; not owned.
+ * @param robotSysPtr Robot team; not owned.
+ * @param timeLimit   Seconds to sample before stopping.
+ * @note The iteration count is left unset, so only the time budget bounds the search.
+ */
 RandomSamplingTaskAllocation::RandomSamplingTaskAllocation(
     BuchiAutomaton* nbaPtr, 
     Environment* envPtr, 
@@ -48,7 +62,10 @@ RandomSamplingTaskAllocation::RandomSamplingTaskAllocation(
       computationTime(0.0) {
 }
 
-// Destructor
+/**
+ * @brief Release the sampled paths and the pruned automaton.
+ * @note The Buchi automaton, environment and robot team belong to the caller and are left alone.
+ */
 RandomSamplingTaskAllocation::~RandomSamplingTaskAllocation() {
     // Clean up allocated Random_Node pointers in paths
     for (auto& [acceptingState, prefixSuffix] : paths) {
@@ -73,8 +90,16 @@ RandomSamplingTaskAllocation::~RandomSamplingTaskAllocation() {
     // BuchiAutomaton, Environment, and MultiRobotSystem are managed elsewhere
 }
 
-// Run the random sampling task allocation algorithm
+/**
+ * @brief Prune the automaton, then plan with the strategy its acceptance condition calls for.
+ *
+ * A finite specification needs only a prefix reaching an accepting state. An infinite one needs
+ * a lasso: a prefix followed by a cycle that revisits the accepting state forever.
+ */
 void RandomSamplingTaskAllocation::run() {
+    // Taken once, so every sampled path starts from the same configuration even if something
+    // else moves the team while planning
+    initialPositions = multiRobotSystem->getRobotPositions();
     pruneInfeasibleNBAPaths();
     //determine whether the buchi is finite
     if (nba->isFinite()) {
@@ -84,6 +109,14 @@ void RandomSamplingTaskAllocation::run() {
     }
 }
 
+/**
+ * @brief Sample prefix paths to every accepting state, keeping the cheapest found per state.
+ *
+ * Each iteration draws a target length in [shortest, |Q|] and grows a random path to the
+ * accepting state, abandoning it as soon as its makespan passes the incumbent. Randomising the
+ * length matters because the path with fewest states is not generally the quickest one.
+ * @note No suffix is stored: a finite run reaches its accepting state once and stops.
+ */
 void RandomSamplingTaskAllocation::runFinitePathPlanner() {
     // Use pruned NBA for path planning
     BuchiAutomaton* searchNBA = (prunedNBA != nullptr) ? prunedNBA : nba;
@@ -105,7 +138,9 @@ void RandomSamplingTaskAllocation::runFinitePathPlanner() {
     
     // Start the timer for computation time measurement for the random iterative search
     clock_t startTime = clock();
-    while (Iterations < maxIterations && computationTime < timeLimit) {
+    // A limit left at 0 is unset, so only the limit the caller gave bounds the search
+    while ((maxIterations == 0 || Iterations < maxIterations) &&
+           (timeLimit == 0.0 || computationTime < timeLimit)) {
         // Iterate through each accepting state
         uint16_t i = 0;
         for (uint16_t acceptingState : acceptingStates) {
@@ -121,11 +156,15 @@ void RandomSamplingTaskAllocation::runFinitePathPlanner() {
             // Incrementally build a random path from the initial state to the accepting state
             Node* goalNode = searchNBA->getNode(acceptingState);
             Node* curNode = searchNBA->getNode(initialState);
+            // Robot clocks and placements, carried along the path as teams are dispatched
+            std::vector<uint16_t> times(multiRobotSystem->getNumRobots(), 0);
+            std::vector<Point> positions = initialPositions;
             std::vector<Random_Node*> newPath;
             newPath.push_back(new Random_Node(0, curNode,
                 std::vector<uint16_t>(),
                 std::vector<std::vector<uint8_t>>(),
-                std::vector<uint16_t>(multiRobotSystem->getNumRobots(), 0)));
+                times));
+            newPath.back()->setPositions(positions);
             uint16_t newMakespan = 0;
             // Current best path for this accepting state, used to stop early if the new path is already worse
             TaskAllocPath& bestPath = paths[acceptingState].first;
@@ -147,12 +186,13 @@ void RandomSamplingTaskAllocation::runFinitePathPlanner() {
                 // Step to a random candidate with a random feasible task allocation
                 Node* nextNode = candidates[std::rand() % candidates.size()];
                 auto [robotsByAP, satisfiedTrueAPs] = getRandomFeasibleTaskAllocation(curNode, nextNode);
-                // Placeholder times, should compute actual times //TO DO COMPUTE ACTUAL TIMES
-                std::vector<uint16_t> curtimes(multiRobotSystem->getNumRobots(), 0);
-                Random_Node* newRandomNode = new Random_Node(newPath.size(), nextNode, satisfiedTrueAPs, robotsByAP, curtimes);
+                // Send each team to its AP's region and advance the clocks of the robots that went
+                applyStep(satisfiedTrueAPs, robotsByAP, times, positions);
+                Random_Node* newRandomNode = new Random_Node(newPath.size(), nextNode, satisfiedTrueAPs, robotsByAP, times);
+                newRandomNode->setPositions(positions);
                 newPath.back()->setNext(newRandomNode);
                 newPath.push_back(newRandomNode);
-                newMakespan += newRandomNode->getCurmakespan();
+                newMakespan = newRandomNode->getCurmakespan();
                 curNode = nextNode;
 
                 // Stop building once the partial path can no longer beat the best makespan
@@ -175,6 +215,15 @@ void RandomSamplingTaskAllocation::runFinitePathPlanner() {
     }
 }
 
+/**
+ * @brief Sample lassos for every accepting state that is reachable and lies on a cycle.
+ *
+ * For an accepting state q the shortest cycle is 1 + dist(successor, q) and the shortest prefix
+ * is dist(initial, q). Each iteration samples a prefix and then a suffix, the suffix continuing
+ * from the clocks and placements the prefix left behind so the lasso is costed as one timeline.
+ * A sampled pair replaces the incumbent only when it finishes sooner overall.
+ * @note Accepting states that are unreachable, or lie on no cycle, are skipped entirely.
+ */
 void RandomSamplingTaskAllocation::runInfinitePathPlanner() {
     // Use pruned NBA for path planning
     BuchiAutomaton* searchNBA = (prunedNBA != nullptr) ? prunedNBA : nba;
@@ -201,21 +250,24 @@ void RandomSamplingTaskAllocation::runInfinitePathPlanner() {
         }
         TaskAllocPath minSufPath{minSuffixLength[i], std::vector<Random_Node*>(), 0};
 
+        // Starting on the accepting state does not count as visiting it, so a run beginning there
+        // still owes a first loop. Its prefix is a cycle of the same minimum length as its suffix,
+        // which is what the tree planner walks for the same specification
         if (acceptingState == initialState) {
-            // Accepting state is the initial state, so no prefix is needed
-            addNoPrePath(acceptingState, minSufPath);
+            minPrefixLength[i] = minSuffixLength[i];
         } else {
-            //get the minimum length path from initial state to accepting state
-            TaskAllocPath minPrePath = getMinLengthPath(searchNBA->getNode(initialState), acceptingNode);
-            minPrefixLength[i] = minPrePath.pathLength;
-            addPath(acceptingState, minPrePath, minSufPath);
+            minPrefixLength[i] = getMinLengthPath(searchNBA->getNode(initialState), acceptingNode).pathLength;
         }
+        TaskAllocPath minPrePath{minPrefixLength[i], std::vector<Random_Node*>(), 0};
+        addPath(acceptingState, minPrePath, minSufPath);
         i++;
     }
 
     // Start the timer for computation time measurement for the random iterative search
     clock_t startTime = clock();
-    while (Iterations < maxIterations && computationTime < timeLimit) {
+    // A limit left at 0 is unset, so only the limit the caller gave bounds the search
+    while ((maxIterations == 0 || Iterations < maxIterations) &&
+           (timeLimit == 0.0 || computationTime < timeLimit)) {
         // Iterate through each accepting state
         uint16_t i = 0;
         for (uint16_t acceptingState : acceptingStates) {
@@ -224,8 +276,7 @@ void RandomSamplingTaskAllocation::runInfinitePathPlanner() {
             i++;
 
             // Skip accepting states that are not on a cycle or are unreachable from the initial state
-            bool needsPrefix = acceptingState != initialState;
-            if (minSuffix == 0 || (needsPrefix && minPrefix == 0)) continue;
+            if (minSuffix == 0 || minPrefix == 0) continue;
 
             Node* acceptingNode = searchNBA->getNode(acceptingState);
             // Current best prefix and suffix for this accepting state, used to stop early if the new path is already worse
@@ -234,18 +285,16 @@ void RandomSamplingTaskAllocation::runInfinitePathPlanner() {
             bool hasBest = !bestSuffix.path.empty();
             uint16_t bestMakespan = bestPrefix.makespan + bestSuffix.makespan;
 
-            // Build the prefix from the initial state to the accepting state
-            TaskAllocPath newPrefix{0, std::vector<Random_Node*>(), 0};
-            if (needsPrefix) {
-                // Pick a random target prefix length (number of nodes) in between [minPrefix, numNBAStates]
-                uint16_t targetLength = minPrefix;
-                if (numNBAStates > minPrefix) {
-                    targetLength = minPrefix + std::rand() % (numNBAStates - minPrefix + 1);
-                }
-                newPrefix = buildRandomPath(searchNBA, searchNBA->getNode(initialState), acceptingNode, targetLength, hasBest, bestMakespan);
-                // Prefix failed to reach the accepting state or is already worse than the best
-                if (newPrefix.path.empty()) continue;
+            // Build the prefix from the initial state to the accepting state. When the two are the
+            // same state buildRandomPath still takes a transition, so this becomes the first loop
+            uint16_t prefixTarget = minPrefix;
+            if (numNBAStates + 1 > minPrefix) {
+                prefixTarget = minPrefix + std::rand() % (numNBAStates + 1 - minPrefix + 1);
             }
+            TaskAllocPath newPrefix = buildRandomPath(searchNBA, searchNBA->getNode(initialState), acceptingNode,
+                                                      prefixTarget, hasBest, bestMakespan);
+            // Prefix failed to reach the accepting state or is already worse than the best
+            if (newPrefix.path.empty()) continue;
 
             // Pick a random target suffix length (number of nodes) in between [minSuffix, numNBAStates + 1]
             // A simple cycle can visit every state once and then return to the start
@@ -253,8 +302,17 @@ void RandomSamplingTaskAllocation::runInfinitePathPlanner() {
             if (numNBAStates + 1 > minSuffix) {
                 targetLength = minSuffix + std::rand() % (numNBAStates + 1 - minSuffix + 1);
             }
+            // The cycle continues from wherever the prefix left the robots, in time and in place,
+            // so its cost follows on from the prefix instead of restarting
+            std::vector<uint16_t> handoffTimes;
+            std::vector<Point> handoffPositions;
+            if (!newPrefix.path.empty()) {
+                handoffTimes = newPrefix.path.back()->getTimes();
+                handoffPositions = newPrefix.path.back()->getPositions();
+            }
             // Build the suffix cycle from the accepting state back to itself, bounded by what is left after the prefix
-            TaskAllocPath newSuffix = buildRandomPath(searchNBA, acceptingNode, acceptingNode, targetLength, hasBest, bestMakespan - newPrefix.makespan);
+            TaskAllocPath newSuffix = buildRandomPath(searchNBA, acceptingNode, acceptingNode, targetLength, hasBest,
+                                                      bestMakespan - newPrefix.makespan, handoffTimes, handoffPositions);
             if (newSuffix.path.empty()) {
                 for (Random_Node* node : newPrefix.path) delete node;
                 continue;
@@ -279,17 +337,44 @@ void RandomSamplingTaskAllocation::runInfinitePathPlanner() {
     }
 }
 
-// Incrementally build a random path from srcNode to goalNode with at most targetLength nodes
-// If srcNode == goalNode this builds a cycle (at least one step is taken)
-// Returns an empty path if the goal is not reached or the makespan exceeds makespanBound (when hasBound is true)
+/**
+ * @brief Grow a random path towards a goal state, allocating robots at every step.
+ *
+ * At each step the successors that can still reach the goal within the remaining length are
+ * collected, one is chosen uniformly at random, and a team is assigned to that transition.
+ * @param searchNBA      Automaton to walk, normally the pruned copy.
+ * @param srcNode        State to start from; pass the goal state to build a cycle.
+ * @param goalNode       State the path must end at.
+ * @param targetLength   Largest number of states the path may contain.
+ * @param hasBound       Whether @p makespanBound applies.
+ * @param makespanBound  Abandon the path once this segment costs more than this.
+ * @param startTimes     Robot clocks to continue from; empty starts them at zero.
+ * @param startPositions Robot placements to continue from; empty uses their current ones.
+ * @return The path and the makespan it adds, or an empty path when the goal was not reached or
+ *         the bound was passed.
+ * @note With @p srcNode equal to @p goalNode at least one transition is taken, so a cycle is
+ *       built rather than the trivial empty path.
+ */
 RandomSamplingTaskAllocation::TaskAllocPath RandomSamplingTaskAllocation::buildRandomPath(
-    BuchiAutomaton* searchNBA, Node* srcNode, Node* goalNode, uint16_t targetLength, bool hasBound, uint16_t makespanBound) {
+    BuchiAutomaton* searchNBA, Node* srcNode, Node* goalNode, uint16_t targetLength, bool hasBound, uint16_t makespanBound,
+    const std::vector<uint16_t>& startTimes, const std::vector<Point>& startPositions) {
     Node* curNode = srcNode;
+
+    // Robot clocks and placements this path continues from
+    std::vector<uint16_t> times = startTimes.empty()
+        ? std::vector<uint16_t>(multiRobotSystem->getNumRobots(), 0) : startTimes;
+    std::vector<Point> positions = startPositions.empty()
+        ? (initialPositions.empty() ? multiRobotSystem->getRobotPositions() : initialPositions)
+        : startPositions;
+    // Makespan is reported as this segment's own contribution, so a prefix and its suffix add up
+    uint16_t startMakespan = times.empty() ? 0 : *std::max_element(times.begin(), times.end());
+
     std::vector<Random_Node*> newPath;
     newPath.push_back(new Random_Node(0, curNode,
         std::vector<uint16_t>(),
         std::vector<std::vector<uint8_t>>(),
-        std::vector<uint16_t>(multiRobotSystem->getNumRobots(), 0)));
+        times));
+    newPath.back()->setPositions(positions);
     uint16_t newMakespan = 0;
     bool reachedGoal = false;
 
@@ -310,12 +395,13 @@ RandomSamplingTaskAllocation::TaskAllocPath RandomSamplingTaskAllocation::buildR
         // Step to a random candidate with a random feasible task allocation
         Node* nextNode = candidates[std::rand() % candidates.size()];
         auto [robotsByAP, satisfiedTrueAPs] = getRandomFeasibleTaskAllocation(curNode, nextNode);
-        // Placeholder times, should compute actual times //TO DO COMPUTE ACTUAL TIMES
-        std::vector<uint16_t> curtimes(multiRobotSystem->getNumRobots(), 0);
-        Random_Node* newRandomNode = new Random_Node(newPath.size(), nextNode, satisfiedTrueAPs, robotsByAP, curtimes);
+        // Send each team to its AP's region and advance the clocks of the robots that went
+        applyStep(satisfiedTrueAPs, robotsByAP, times, positions);
+        Random_Node* newRandomNode = new Random_Node(newPath.size(), nextNode, satisfiedTrueAPs, robotsByAP, times);
+        newRandomNode->setPositions(positions);
         newPath.back()->setNext(newRandomNode);
         newPath.push_back(newRandomNode);
-        newMakespan += newRandomNode->getCurmakespan();
+        newMakespan = newRandomNode->getCurmakespan() - startMakespan;
         curNode = nextNode;
 
         // Stop building once the partial path can no longer beat the best makespan
@@ -334,7 +420,14 @@ RandomSamplingTaskAllocation::TaskAllocPath RandomSamplingTaskAllocation::buildR
     return TaskAllocPath{static_cast<uint16_t>(newPath.size()), newPath, newMakespan};
 }
 
-// Get a minimum length (fewest nodes) path from srcNode to goalNode using BFS
+/**
+ * @brief Breadth-first search for the fewest states between two automaton states.
+ * @param srcNode  State to start from.
+ * @param goalNode State to reach.
+ * @return A path whose @c pathLength counts the states on a shortest route, 1 when the two are
+ *         the same state, or 0 when the goal is unreachable or either argument is null.
+ * @note Walks the pruned automaton when one exists, so only feasible transitions are counted.
+ */
 RandomSamplingTaskAllocation::TaskAllocPath RandomSamplingTaskAllocation::getMinLengthPath(Node* srcNode, Node* goalNode) {
     if (!srcNode || !goalNode) {
         return TaskAllocPath{0, std::vector<Random_Node*>(), 0};
@@ -393,54 +486,41 @@ RandomSamplingTaskAllocation::TaskAllocPath RandomSamplingTaskAllocation::getMin
     return TaskAllocPath{0, std::vector<Random_Node*>(), 0};
 }
 
-//prune the NBA to remove infeasible edges based on the robot capabilities and the task requirements
+/**
+ * @brief Build a copy of the automaton with every transition the team cannot execute removed.
+ *
+ * A transition survives when disjoint teams can be assigned to all propositions of at least one
+ * of its conjunctions. That is exactly the question the allocator answers later, so a surviving
+ * transition can always be allocated during sampling.
+ * @note The copy owns its own states, leaving the original automaton untouched. Pruning a second
+ *       time discards the previous copy.
+ */
 void RandomSamplingTaskAllocation::pruneInfeasibleNBAPaths() {
-    // Create a deep copy of the NBA to avoid modifying the original
+    // Create a deep copy of the NBA to avoid modifying the original.
+    // Pruning again replaces the previous copy, which owns its own nodes
+    delete prunedNBA;
     prunedNBA = new BuchiAutomaton(*nba);
     
     // Iterate through all edges in the pruned NBA and remove edges that cannot be satisfied
     // by any robot combination in the system
     const auto& nodeMap = prunedNBA->getNodes();
-    
+
     for (const auto& [nodeId, node] : nodeMap) {
         if (!node) continue;
         
         std::vector<Edge> validEdges;
         for (const auto& edge : node->getEdges()) {
-            // Get the true APs for this edge
-            std::vector<std::vector<uint16_t>> trueAPs = prunedNBA->getTrueAPs(node->getId(), edge.getDstId());
-            
-            // Check if any AP set can be satisfied
+            // Read the AP sets off the edge itself, not through BuchiAutomaton::getTrueAPs,
+            // so multi-AP conjunctions survive for the team to satisfy together
+            std::vector<std::vector<uint16_t>> trueAPs = edge.getTrueAPs();
+
+            // An edge is feasible when disjoint teams can be assigned to every AP of at least one
+            // of its conjunctions. This is the same question the allocator answers when the path
+            // builder takes the edge, so an edge kept here can always be allocated later
             bool edgeIsFeasible = false;
+            std::vector<std::vector<uint8_t>> teams;
             for (const auto& apSet : trueAPs) {
-                // Try to find a feasible allocation for this AP set
-                std::vector<std::vector<uint8_t>> randomAllocation = getRandomAllocation(apSet);
-                bool apSetFeasible = true;
-                
-                for (size_t apIdx = 0; apIdx < apSet.size() && apSetFeasible; ++apIdx) {
-                    uint16_t ap = apSet[apIdx];
-                    std::vector<bool> requiredCapabilities = prunedNBA->getLTLFormula()->getRequiredCapabilities(ap);
-                    std::vector<uint8_t> assignedRobots = randomAllocation[apIdx];
-                    
-                    // Check if assigned robots can satisfy required capabilities
-                    std::vector<bool> combinedCapabilities(requiredCapabilities.size(), false);
-                    for (uint8_t robotId : assignedRobots) {
-                        std::vector<bool> roboCaps = multiRobotSystem->getRobotCapabilities(robotId + 1);
-                        for (size_t j = 0; j < roboCaps.size() && j < combinedCapabilities.size(); ++j) {
-                            combinedCapabilities[j] = combinedCapabilities[j] || roboCaps[j];
-                        }
-                    }
-                    
-                    // Verify all required capabilities are met
-                    for (size_t j = 0; j < requiredCapabilities.size(); ++j) {
-                        if (requiredCapabilities[j] && (j >= combinedCapabilities.size() || !combinedCapabilities[j])) {
-                            apSetFeasible = false;
-                            break;
-                        }
-                    }
-                }
-                
-                if (apSetFeasible) {
+                if (assignTeamsToConjunction(apSet, teams)) {
                     edgeIsFeasible = true;
                     break;
                 }
@@ -456,96 +536,203 @@ void RandomSamplingTaskAllocation::pruneInfeasibleNBAPaths() {
     }
 }
 
-//get a random feasible task allocation for the robots based on the trueAPs and destination product states
-//returns a pair of (robotsByAP, satisfiedTrueAPs)
-//robotsByAP[i] = vector of robot indices assigned to satisfy apSet[i]
-//satisfiedTrueAPs = the AP set (conjunction) that was satisfied
-//
-//Example: If satisfiedTrueAPs = [5, 7] (AP 5 AND AP 7 must be satisfied)
-//         and robotsByAP = [[0, 1], [2]]
-//         Then: robots 0,1 are assigned to satisfy AP 5
-//               robot 2 is assigned to satisfy AP 7
-//
+/**
+ * @brief Assign robots to the propositions discharged by one transition.
+ * @param curNode Source automaton state.
+ * @param newNode Destination automaton state.
+ * @return The teams, one per proposition, together with the conjunction they satisfy. Both come
+ *         back empty when no conjunction of the transition can be staffed.
+ *
+ * Example: a returned conjunction of [5, 7] with teams [[1, 2], [3]] puts robots 1 and 2 on
+ * proposition 5 and robot 3 on proposition 7.
+ * @note AP sets are read off the transitions themselves rather than through
+ *       BuchiAutomaton::getTrueAPs, which discards multi-proposition conjunctions. The automaton
+ *       is nondeterministic, so every transition joining the two states offers its own options.
+ */
 std::pair<std::vector<std::vector<uint8_t>>, std::vector<uint16_t>> RandomSamplingTaskAllocation::getRandomFeasibleTaskAllocation(Node* curNode, Node* newNode) {
-    //need to get a vector of all possible true ap sets from all the edges to the new node
-    std::vector<std::vector<uint16_t>> trueAPs = nba->getTrueAPs(curNode->getId(), newNode->getId());
-    bool isFeasible = false;
-    std::vector<std::vector<uint8_t>> robotsByAP;
-    std::vector<uint16_t> satisfiedApSet;
-    
-    // Keep trying until a feasible allocation is found
-    while (!isFeasible) {
-        for (const auto& apSet : trueAPs) {
-            robotsByAP.clear();
-            robotsByAP.resize(apSet.size());
-            //need to get a random allocation of robots for each ap in the set
-            std::vector<std::vector<uint8_t>> randomAllocation = getRandomAllocation(apSet);
-            // For each AP in this conjunction, allocate robots to satisfy it
-            bool allAPsSatisfied = true;
-            for (size_t apIdx = 0; apIdx < apSet.size(); ++apIdx) {
-                uint16_t ap = apSet[apIdx];
-                std::vector<bool> requiredCapabilities = nba->getLTLFormula()->getRequiredCapabilities(ap);
-               
-                // Get the robots assigned to this AP
-                std::vector<uint8_t> assignedRobots = randomAllocation[apIdx];
-                
-                // Combine the capabilities of all robots assigned to this AP using OR
-                std::vector<bool> combinedCapabilities(requiredCapabilities.size(), false);
-                for (uint8_t robotId : assignedRobots) {
-                    std::vector<bool> roboCaps = multiRobotSystem->getRobotCapabilities(robotId + 1);  // Convert 0-based index to 1-based robot ID
-                    
-                    // OR the robot's capabilities with the combined capabilities
-                    for (size_t j = 0; j < roboCaps.size() && j < combinedCapabilities.size(); ++j) {
-                        combinedCapabilities[j] = combinedCapabilities[j] || roboCaps[j];
-                    }
-                }
-                
-                // Check if all required capabilities are satisfied by the combined capabilities
-                bool canSatisfy = true;
-                for (size_t j = 0; j < requiredCapabilities.size(); ++j) {
-                    if (requiredCapabilities[j] && (j >= combinedCapabilities.size() || !combinedCapabilities[j])) {
-                        canSatisfy = false;
-                        break;
-                    }
-                }
-                
-                // If this AP cannot be satisfied, the entire set is not feasible
-                if (!canSatisfy) {
-                    allAPsSatisfied = false;
-                    break;
-                }
-            }
-            
-            // If all APs in this conjunction can be satisfied, this conjunction is feasible
-            if (allAPsSatisfied) {
-                satisfiedApSet = apSet;
-                robotsByAP = randomAllocation;
-                isFeasible = true;
-                break;
-            }
+    // Read the AP sets off the edges themselves, not through BuchiAutomaton::getTrueAPs,
+    // so multi-AP conjunctions survive. The NBA is nondeterministic, so every edge between
+    // these two states contributes its own options
+    std::vector<std::vector<uint16_t>> trueAPs;
+    for (const Edge& edge : curNode->getEdgestoNode(newNode->getId())) {
+        for (const auto& apSet : edge.getTrueAPs()) {
+            trueAPs.push_back(apSet);
         }
     }
-    
+    std::vector<std::vector<uint8_t>> robotsByAP;
+    std::vector<uint16_t> satisfiedApSet;
+
+    // Take the first conjunction that can be staffed. The assignment is randomised inside, so
+    // repeated calls on the same edge give different teams without drawing and retesting
+    for (const auto& apSet : trueAPs) {
+        if (assignTeamsToConjunction(apSet, robotsByAP)) {
+            satisfiedApSet = apSet;
+            break;
+        }
+    }
+
     return std::make_pair(robotsByAP, satisfiedApSet);
 }
 
-// gets a complete random allocation of robots to the given set of APs
-std::vector<std::vector<uint8_t>> RandomSamplingTaskAllocation::getRandomAllocation(std::vector<uint16_t> apSet) {
-    // Get the number of robots in the system
-    uint8_t numRobots = multiRobotSystem->getNumRobots();
-    
-    // Initialize a vector to hold robot assignments for each AP
-    std::vector<std::vector<uint8_t>> robotsByAP(apSet.size());
-    
-    // Randomly assign each robot to one of the APs
-    for (uint8_t robotId = 0; robotId < numRobots; ++robotId) {
-        // Randomly select an AP for this robot
-        uint16_t randomApIndex = std::rand() % apSet.size();
-        if (std::rand() % 2 == 0) {  // 50% chance to assign this robot to the selected AP
-            robotsByAP[randomApIndex].push_back(robotId);
+/**
+ * @brief Advance robot clocks and placements across one step of a path.
+ *
+ * Every robot serving a proposition travels to that proposition's region, and the whole team is
+ * charged the last arrival, since the task is not discharged until its slowest member is in
+ * place. Robots serving nothing on this step neither move nor age.
+ * @param apSet     Propositions discharged on this step.
+ * @param teams     Robots assigned to each proposition, by 1-based id.
+ * @param times     Per-robot clocks, updated in place.
+ * @param positions Per-robot placements, updated in place.
+ */
+void RandomSamplingTaskAllocation::applyStep(const std::vector<uint16_t>& apSet,
+                                             const std::vector<std::vector<uint8_t>>& teams,
+                                             std::vector<uint16_t>& times,
+                                             std::vector<Point>& positions) const {
+    for (size_t a = 0; a < apSet.size() && a < teams.size(); ++a) {
+        // The region this proposition is discharged in
+        uint16_t region = nba->getLTLFormula()->getBatchAP(apSet[a]).getAP();
+        Point target = environment->TSStateIdToGridCenter(region);
+
+        // The task is only complete once its slowest member arrives, so the whole team is
+        // charged that arrival and none of them is free any earlier
+        uint16_t arrival = 0;
+        for (uint8_t robotId : teams[a]) {
+            if (robotId == 0 || robotId > times.size() || robotId > positions.size()) continue;
+            Robot* robot = multiRobotSystem->getRobot(robotId);
+            if (!robot) continue;
+            uint16_t reached = times[robotId - 1] + robot->getTravelTime(positions[robotId - 1], target);
+            if (reached > arrival) arrival = reached;
+        }
+        for (uint8_t robotId : teams[a]) {
+            if (robotId == 0 || robotId > times.size() || robotId > positions.size()) continue;
+            times[robotId - 1] = arrival;
+            positions[robotId - 1] = target;
         }
     }
-    return robotsByAP;
+}
+
+/**
+ * @brief Recursively cover the capabilities still outstanding across a conjunction.
+ *
+ * Takes a proposition with an uncovered requirement and branches over every unused robot that
+ * carries it. Any valid assignment must cover that requirement with one of those robots, so the
+ * search cannot miss a solution that exists.
+ * @param required   Required capabilities per proposition.
+ * @param caps       Capabilities per robot, indexed from zero.
+ * @param order      Order in which robots are tried; randomised by the caller.
+ * @param used       Robots already committed; updated as the search descends and backtracks.
+ * @param covered    Requirements already met; updated as the search descends and backtracks.
+ * @param robotsByAP Teams built so far, carrying 1-based robot ids.
+ * @return True once every proposition is fully covered.
+ */
+static bool coverRemainingCapabilities(const std::vector<std::vector<bool>>& required,
+                                       const std::vector<std::vector<bool>>& caps,
+                                       const std::vector<uint8_t>& order,
+                                       std::vector<bool>& used,
+                                       std::vector<std::vector<bool>>& covered,
+                                       std::vector<std::vector<uint8_t>>& robotsByAP) {
+    for (size_t i = 0; i < required.size(); ++i) {
+        for (size_t j = 0; j < required[i].size(); ++j) {
+            if (!required[i][j] || covered[i][j]) continue;
+
+            // Proposition i still needs capability j, so some unused robot carrying j must take it
+            for (uint8_t r : order) {
+                if (used[r] || j >= caps[r].size() || !caps[r][j]) continue;
+
+                // Giving r to proposition i covers every capability of i that r happens to carry
+                std::vector<size_t> newlyCovered;
+                for (size_t k = 0; k < required[i].size(); ++k) {
+                    if (required[i][k] && !covered[i][k] && k < caps[r].size() && caps[r][k]) {
+                        covered[i][k] = true;
+                        newlyCovered.push_back(k);
+                    }
+                }
+                used[r] = true;
+                robotsByAP[i].push_back(r + 1);  // teams carry 1-based robot ids
+
+                if (coverRemainingCapabilities(required, caps, order, used, covered, robotsByAP)) {
+                    return true;
+                }
+
+                robotsByAP[i].pop_back();
+                used[r] = false;
+                for (size_t k : newlyCovered) covered[i][k] = false;
+            }
+            return false;  // nothing left can supply this capability
+        }
+    }
+    return true;  // every proposition fully covered
+}
+
+/**
+ * @brief Assign a disjoint team to every proposition of a conjunction.
+ * @param apSet      Propositions that must all be discharged together.
+ * @param robotsByAP Receives one team per proposition, by 1-based robot id.
+ * @return True when an assignment exists, false when none does.
+ * @note A robot serves one proposition only, so conjunctions asking for more robots carrying
+ *       some capability than the team holds are rejected before any search. The robot order is
+ *       randomised, so repeated calls give different assignments, but the search is exhaustive:
+ *       false means genuinely infeasible rather than unlucky. An empty conjunction, which comes
+ *       from a purely negative transition label, is satisfied by the empty assignment.
+ */
+bool RandomSamplingTaskAllocation::assignTeamsToConjunction(
+        const std::vector<uint16_t>& apSet,
+        std::vector<std::vector<uint8_t>>& robotsByAP) const {
+    robotsByAP.assign(apSet.size(), std::vector<uint8_t>());
+    // A conjunction with no APs asks for nothing, so the empty assignment serves it
+    if (apSet.empty()) return true;
+
+    //get the total required capabilities
+    std::vector<std::vector<bool>> required(apSet.size());
+    for (size_t i = 0; i < apSet.size(); ++i) {
+        required[i] = nba->getLTLFormula()->getRequiredCapabilities(apSet[i]);
+    }
+
+    //get a 2d vector of robot capabilities
+    uint8_t numRobots = multiRobotSystem->getNumRobots();
+    std::vector<std::vector<bool>> caps(numRobots);
+    for (uint8_t r = 0; r < numRobots; ++r) {
+        caps[r] = multiRobotSystem->getRobotCapabilities(r + 1);  // robot ids are 1-based
+    }
+
+    // Cheap rejects before searching: a robot serves one proposition, so for every capability
+    // there must be at least as many robots carrying it as propositions asking for it
+    std::vector<uint16_t> supply, demand;
+    for (const auto& roboCaps : caps) {
+        if (roboCaps.size() > supply.size()) supply.resize(roboCaps.size(), 0);
+        for (size_t j = 0; j < roboCaps.size(); ++j) {
+            if (roboCaps[j]) supply[j]++;
+        }
+    }
+    for (const auto& req : required) {
+        if (req.size() > demand.size()) demand.resize(req.size(), 0);
+        for (size_t j = 0; j < req.size(); ++j) {
+            if (req[j]) demand[j]++;
+        }
+    }
+    for (size_t j = 0; j < demand.size(); ++j) {
+        if (demand[j] > (j < supply.size() ? supply[j] : 0)) return false;
+    }
+
+    // Randomise which robot is tried first so repeated calls give different assignments
+    std::vector<uint8_t> order(numRobots);
+    for (uint8_t r = 0; r < numRobots; ++r) order[r] = r;
+    for (size_t i = order.size(); i > 1; --i) {
+        std::swap(order[i - 1], order[std::rand() % i]);
+    }
+
+    std::vector<bool> used(numRobots, false);
+    std::vector<std::vector<bool>> covered(apSet.size());
+    for (size_t i = 0; i < apSet.size(); ++i) {
+        covered[i].assign(required[i].size(), false);
+    }
+
+    if (coverRemainingCapabilities(required, caps, order, used, covered, robotsByAP)) {
+        return true;
+    }
+    robotsByAP.assign(apSet.size(), std::vector<uint8_t>());
+    return false;
 }
 
 //========================
@@ -685,16 +872,17 @@ void RandomSamplingTaskAllocation::setComputationTime(double time) {
 // PATH MANAGEMENT
 //========================
 
+/**
+ * @brief Record the prefix and suffix planned for an accepting state.
+ */
 void RandomSamplingTaskAllocation::addPath(uint16_t acceptingState, TaskAllocPath prePath, TaskAllocPath sufPath) {
     paths[acceptingState] = {prePath, sufPath};
 }
 
-void RandomSamplingTaskAllocation::addNoPrePath(uint16_t acceptingState, TaskAllocPath sufPath) {
-    // Create an empty prefix path (no nodes, zero length, zero makespan)
-    TaskAllocPath emptyPrePath{0, std::vector<Random_Node*>(), 0};
-    paths[acceptingState] = {emptyPrePath, sufPath};
-}
-
+/**
+ * @brief Record a plan for a finite specification.
+ * @note A finite run stops at its accepting state, so the suffix is stored empty.
+ */
 void RandomSamplingTaskAllocation::addNoSufPath(uint16_t acceptingState, TaskAllocPath prePath) {
     // Create an empty suffix path (no nodes, zero length, zero makespan)
     TaskAllocPath emptySufPath{0, std::vector<Random_Node*>(), 0};

@@ -4,9 +4,27 @@
 #include <set>
 #include <iostream>
 
+BuchiAutomaton::BuchiAutomaton(const BuchiAutomaton& other)
+    : acceptingStates(other.acceptingStates),
+      ltlFormula(other.ltlFormula),        // externally owned, shared by design
+      spotAutomaton(other.spotAutomaton),  // read-only, shared by design
+      initialState(other.initialState),
+      isInfiniteFlag(other.isInfiniteFlag) {
+    numNodes = other.numNodes;
+    numEdges = other.numEdges;
+    // Node owns its edges by value, so copying the node is enough to decouple the two automata
+    for (const auto& pair : other.nodeMap) {
+        nodeMap[pair.first] = (pair.second != nullptr) ? new Node(*pair.second) : nullptr;
+    }
+}
+
 BuchiAutomaton::~BuchiAutomaton() {
-    // Clean up dynamically allocated nodes
-    // Note: Node pointers should be managed by a smart pointer in a production system
+    // Every node in the map was allocated by this automaton, and the copy constructor
+    // gives a copy its own nodes, so no other automaton can be holding these
+    for (auto& pair : nodeMap) {
+        delete pair.second;
+    }
+    nodeMap.clear();
 }
 
 void BuchiAutomaton::add_Node(Node* node) {

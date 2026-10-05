@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <string>
 #include <vector>
+#include <limits>
 
 // ==================== INITIALIZATION ====================
 
@@ -159,12 +160,18 @@ double AlgorithmMetrics::computeTreeProductRatio() const {
 
 double AlgorithmMetrics::computeMemoryReductionRatio() const {
     if (subtree_efficiency_.full_product_automaton_memory_MB == 0) return 0.0;
-    return static_cast<double>(subtree_efficiency_.task_allocation_algorithm_memory_MB) / 
+    // Percent reduction: (full - subtree) / full
+    return (subtree_efficiency_.full_product_automaton_memory_MB -
+            subtree_efficiency_.task_allocation_algorithm_memory_MB) /
            subtree_efficiency_.full_product_automaton_memory_MB;
 }
 double AlgorithmMetrics::computeOptimalityGap() const {
     if (solution_quality_.tree_makespan_seconds == 0) return 0.0;
-    return 100.0 * static_cast<double>(solution_quality_.tree_makespan_seconds-solution_quality_.product_makespan_seconds) / 
+    // Return NaN if no path was found (sentinel: product makespan is max uint32)
+    if (solution_quality_.product_makespan_seconds == std::numeric_limits<uint32_t>::max()) {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+    return 100.0 * static_cast<double>(solution_quality_.tree_makespan_seconds-solution_quality_.product_makespan_seconds) /
            solution_quality_.tree_makespan_seconds;
 }
 double AlgorithmMetrics::computeRuntimeSpeedup() const {

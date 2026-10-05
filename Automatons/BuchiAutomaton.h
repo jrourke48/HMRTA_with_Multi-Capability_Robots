@@ -68,6 +68,10 @@ public:
         }
     }
 
+    // Copies the nodes themselves, so edits to one automaton's edges (e.g. pruning) leave the other alone
+    BuchiAutomaton(const BuchiAutomaton& other);
+    BuchiAutomaton& operator=(const BuchiAutomaton&) = delete;
+
     ~BuchiAutomaton() override;
     // Override pure virtual methods from Automaton
     void add_Node(Node* node) override;

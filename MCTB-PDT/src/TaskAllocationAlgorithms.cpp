@@ -308,9 +308,9 @@ PlanningDecisionTree* TaskAllocationAlgorithms::intensiveInterTaskRelationshipTr
     metrics->iv_.num_inter_task_constraints = static_cast<int>(treebatchvals.size());
     
     // Store solution quality metrics
-    metrics->setSolutionMakespan(finalOptimalNode->getMaxTime());
-    metrics->setSumOfTravelTimes(finalOptimalNode->getSumOfTimes());
-    metrics->setRobotsUtilized(finalOptimalNode->getNumUtilizedRobots());
+    metrics->setSolutionMakespan(finalOptimalNode->getParent()->getMaxTime());
+    metrics->setSumOfTravelTimes(finalOptimalNode->getParent()->getSumOfTimes());
+    metrics->setRobotsUtilized(finalOptimalNode->getParent()->getNumUtilizedRobots());
     
     return tree;
 }

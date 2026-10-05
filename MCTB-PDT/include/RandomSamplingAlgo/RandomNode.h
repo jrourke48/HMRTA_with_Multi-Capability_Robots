@@ -2,7 +2,8 @@
 #define RANDOM_NODE_H
 
 #include <vector>
-#include "../../Automatons/Edge_Node.h"
+#include "../Environment/Point.h"
+#include "../../../Automatons/Edge_Node.h"
 
 class Random_Node {
     // Define the members and methods for the Random_Node class here
@@ -12,6 +13,7 @@ class Random_Node {
         std::vector<uint16_t> trueAPs; // Task IDs associated with this node
         std::vector<std::vector<uint8_t>> taskAllocations; //the Task allocation for each region for this node
         std::vector<uint16_t> times; // Task requirements for this node
+        std::vector<Point> positions; // Positions associated with this node
         uint16_t curmakespan; // Time associated with this node
         Random_Node* next; // Pointer to next node in the path
         //set curmakespan should only be called internally
@@ -43,7 +45,11 @@ class Random_Node {
         // Times getters and setters
         const std::vector<uint16_t>& getTimes() const;
         void setTimes(const std::vector<uint16_t>& times);
-        
+
+        // Positions getters and setters
+        const std::vector<Point>& getPositions() const;
+        void setPositions(const std::vector<Point>& positions);
+
         // Current makespan getters and setters
         uint16_t getCurmakespan() const;
         

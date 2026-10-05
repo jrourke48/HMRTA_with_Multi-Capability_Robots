@@ -36,7 +36,12 @@ public:
 
     //Constructor from individual components (TS, Mult-Robot System, and automaton states)
     ProductAutomaton(const Environment& env, const MultiRobotSystem& mrs, const BuchiAutomaton& buchiAutomaton);
-    
+
+    // The destructor deletes every node, so a copy would double free them. Nothing copies a
+    // product automaton today; add a deep copy like BuchiAutomaton's if that ever changes
+    ProductAutomaton(const ProductAutomaton&) = delete;
+    ProductAutomaton& operator=(const ProductAutomaton&) = delete;
+
     // Compute the optimal accepting path starting from the given state
     std::tuple<std::vector<uint16_t>, uint32_t> OptimalAcceptingPath();
     

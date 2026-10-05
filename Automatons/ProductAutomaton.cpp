@@ -40,9 +40,12 @@ ProductAutomaton::ProductAutomaton(const Environment& env, const MultiRobotSyste
     mrsPtr = &mrs;
     buchiPtr = &buchiAutomaton;
     
-    // Initialize product automaton based on the individual components
-    // This is a placeholder implementation and should be replaced with actual logic
-    if (buchiAutomaton.getNumStates()*std::pow(5/6*env.getTransitionSystem()->getNumStates() , mrs.getNumRobots()) > UINT16_MAX) {
+    // Node ids are uint16_t, so refuse to build a product whose states cannot all be addressed.
+    // The joint space is |S|^numRobots, discounted by the fraction of each robot's transition
+    // system expected to survive filtering. The division must be done in floating point:
+    // as an integer expression 5/6 is 0, which made this check unreachable
+    const double statesPerRobot = (5.0 / 6.0) * env.getTransitionSystem()->getNumStates();
+    if (buchiAutomaton.getNumStates() * std::pow(statesPerRobot, mrs.getNumRobots()) > UINT16_MAX) {
         std::cerr << "Product automaton too large to represent with uint16_t" << std::endl;
         return;
     }

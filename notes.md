@@ -149,3 +149,120 @@
 - Product automaton growth correlation with robot count and capability requirements
 - Impact of overlapping capability distribution on algorithm performance
 - Feasibility thresholds per automaton as homogeneity varies
+
+## Session 3 (2026-09-29) - Sampling Test Failures & NBA Pruning Bugs
+
+Starting point: `TestSamplingTaskAllocation` at 49 passed / 12 failed, and the product
+automaton reporting a worse makespan (345) than the random sampling allocator (308) on
+the same 4-robot instance.
+
+### ProductAutomaton: Suffix-Only Accepting Path
+- Removed step 3 of `OptimalAcceptingPath()` (the extra "+1 node" appended after the cycle)
+- Path is now just prefix + suffix: initial -> accepting state -> cycle back to it
+- `finalLabel` references replaced with `secondAcceptingLabel` throughout
+
+### ProductAutomaton: Global Optimality Experiment (REVERTED)
+- Tried replacing the two-step search with one that enumerates every accepting-on-cycle
+  state, finds the best cycle for each, and keeps the global minimum
+- **Result**: identical makespan, dramatically slower. Reverted via `git checkout`
+- **Takeaway**: the two-step search was not the source of the 345 vs 308 gap. The gap is
+  more likely in which edges exist in the product at all (see Structural Item 1)
+
+### Issues Resolved
+
+**Issue 1: Inverted Feasibility Logic in pruneInfeasibleNBAPaths**
+- **Problem**: Edges were kept/dropped on the wrong condition
+- **Root Cause**: `edgeIsFeasible = true` was set when a required capability was *missing*
+- **Solution**: Track `apSetFeasible` per conjunction; only mark the edge feasible when a
+  full conjunction is satisfied by the team (OR of ANDs, evaluated correctly)
+- **Impact**: Test 2 capability checks now pass
+
+**Issue 2: Edges With No APs Were Being Pruned**
+- **Problem**: Edges labelled `!p1`, `!p0 & !p1`, or `true` were removed from the pruned NBA
+- **Root Cause**: Empty `trueAPs` meant the feasibility loop never ran, leaving the edge
+  marked infeasible. Semantically these edges require *no* robots, so they are always feasible
+- **Solution**: Treat empty `trueAPs` as feasible before entering the conjunction loop
+- **Impact**: Negation-only self-loops (e.g. `3 -> 3[!p1]`) survive pruning
+
+**Issue 3: Infinite Loop in getRandomFeasibleTaskAllocation (THE HANG)**
+- **Problem**: Test 5 hung forever after Issue 2 was fixed
+- **Root Cause**: `while (!isFeasible)` wrapped a `for` over `trueAPs`. With `trueAPs` empty
+  the body never executed and `isFeasible` never flipped. Fixing Issue 2 meant the path
+  builder could finally step onto a negation-only edge and trigger it
+- **Solution**: Return an empty allocation immediately for an edge with no positive APs;
+  replaced the unbounded `while` with a capped retry (`MAX_ALLOCATION_ATTEMPTS = 100`);
+  clear `robotsByAP` on failure so a stale draw is never paired with an empty AP set
+- **Impact**: Hang eliminated
+
+**Issue 4: Allocation Read From the Unpruned NBA**
+- **Problem**: "satisfied AP set is not one of the edge's AP sets" across Tests 5 and 7
+- **Root Cause**: `getRandomFeasibleTaskAllocation` called `nba->getTrueAPs(...)` while
+  `buildRandomPath` and `validateStep` both work on `prunedNBA`. An AP set that pruning had
+  removed could be allocated for a step the pruned edge no longer permits
+- **Solution**: Select `prunedNBA` when present, matching the pattern already in `getMinLengthPath`
+- **Impact**: Only shows up when pruning actually removes edges, which is why the
+  all-capabilities fixture passed and the no-camera / infinite fixtures did not
+
+**Issue 5: BuchiAutomaton Had No Copy Constructor (Shallow Copy)**
+- **Problem**: "original NBA edges are unchanged after pruning" failed whenever edges were
+  actually removed
+- **Root Cause**: `prunedNBA = new BuchiAutomaton(*nba)` used the implicit copy constructor.
+  `nodeMap` is `std::map<uint16_t, Node*>`, so both automata pointed at the *same* Node
+  objects and `node->setEdges(...)` mutated the original
+- **Solution**: Added a copy constructor that allocates a new `Node` per entry. `Node` owns
+  its `edges` vector by value, so copying the node is enough to decouple them. `ltlFormula`
+  and `spotAutomaton` stay shared by design. `operator=` deleted
+- **Impact**: Test 2 fully green
+
+**Issue 6: Unset Iteration/Time Limits Read as Zero**
+- **Problem**: Each constructor alone ran 0 iterations; only setting *both* limits worked
+- **Root Cause**: `while (Iterations < maxIterations && computationTime < timeLimit)` in both
+  planners. The iteration constructor leaves `timeLimit = 0.0`, so `computationTime < 0.0`
+  was false on entry, and symmetrically for the time constructor
+- **Solution**: A limit left at 0 is treated as unset, so only the limit the caller supplied bounds the loop
+- **Impact**: 4 "ran 0" failures in Tests 6, 7, 9
+
+**Issue 7: Modulo by Zero in getRandomAllocation**
+- **Problem**: `std::rand() % apSet.size()` is undefined behaviour on an empty AP set
+- **Root Cause**: No guard. Currently unreachable, but directly in the path of Structural Item 1
+- **Solution**: Return the empty allocation before the loop when `apSet` is empty
+
+### Structural Items (NOT FIXED - need a design decision)
+
+**4. Rejection sampling with a 50% coin flip**
+- `getRandomAllocation` assigns each robot with probability 1/2, so an AP needing all four
+  robots is drawn 1-in-16
+- The 100-attempt cap stops the hang but does not fix the sampler: if a conjunction is only
+  satisfiable by a specific near-full assignment, the result is silently "no allocation"
+  rather than the allocation that exists
+- Worth replacing with a constructive assignment that covers required capabilities directly
+
+### Open Question
+- Product automaton reports makespan 345; the random sampling allocator reports 308 on the
+  same instance. Structural Item 1 is the leading suspect — verify before assuming the
+  path search itself is at fault (the global-optimality rewrite already ruled that out)
+
+working
+Every remaining failure is a multi-AP conjunction the sampler can't allocate. Here's why, using your fixtures:
+
+createTestMultiRobotSystem2 gives 6 robots with exactly one capability each — 2 ground, 2 camera, 2 GPS. Fixture 1's propositions p0, p1, p2 each require capabilities {0, 3, 5} = ground + camera + GPS. So one proposition consumes three robots, one of each type, and robots can't be shared between propositions in the same conjunction.
+
+Conjunction	Robots needed	Status
+p1 (1 AP)	3	feasible
+p0 & p2 (2 APs)	6 — the entire team, perfectly split	feasible, but only 1 partition in 512 draws
+p0 & p1 & p2 (3 APs)	9	impossible — only 6 robots exist
+Now match that against the failures: 0->0 and 1->0 are p0 & p1 & p2 (impossible). 0->5, 1->5, 1->2 are 2-AP (possible but ~18% chance of being found within the 100 retries). That accounts for all 8.
+
+Two distinct bugs behind it
+1. The feasibility test ignores that robots can't be shared. pruneInfeasibleNBAPaths checks each proposition against the pooled capabilities of the whole team, independently per proposition. So p0 & p1 & p2 looks feasible — the team does collectively have ground, camera and GPS — even though satisfying all three at once needs 9 robots. The edge is kept, then nothing downstream can allocate it.
+
+The test's reference helper edgeIsDeterministicallyFeasible makes the same relaxation, which is why "no infeasible edge is kept" passes. Both share the blind spot, so the test suite can't catch it. Deciding conjunction feasibility properly is a bipartite matching problem, not an independent per-AP check.
+
+2. Nothing checks whether allocation actually succeeded. When getRandomFeasibleTaskAllocation exhausts its retries it returns an empty AP set — which I added — but buildRandomPath and runFinitePathPlanner both feed that straight into a new Random_Node without looking:
+
+
+auto [robotsByAP, satisfiedTrueAPs] = getRandomFeasibleTaskAllocation(curNode, nextNode);
+Random_Node* newRandomNode = new Random_Node(..., satisfiedTrueAPs, robotsByAP, curtimes);
+So a failed allocation becomes a path step carrying an empty AP set, and validateStep correctly reports that empty set isn't one of the edge's options. That's the literal error you're seeing. The fix is to treat a failed allocation as "this edge can't be taken" and pick a different candidate.
+
+Bug 2 is small and unambiguous. Bug 1 is the modeling decision — and note it also affects the product automaton, which uses the same independent-per-AP capability pooling at ProductAutomaton.cpp:572. Say which you want and I'll do it.

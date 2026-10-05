@@ -90,10 +90,10 @@ public:
                 andEnd = orClause.find('&', andStart);
             }
             
-            if (!andClauseAPs.empty()) {
-                result.push_back(andClauseAPs);
-            }
-            
+            // A clause with no positive APs (e.g. "!p1" or "true") is still an option:
+            // it is satisfied by placing no robots, so it is kept as an empty AP set
+            result.push_back(andClauseAPs);
+
             if (orEnd == std::string::npos) break;
             orStart = orEnd + 1;
             orEnd = label.find('|', orStart);

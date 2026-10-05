@@ -175,7 +175,7 @@ void Environment::print_Environment() const {
                 cell = '#';
             } else {
                 // Check if this is a region center
-                bool isCenter = false;
+                // bool isCenter = false;
                 for (const auto& mapping : stateIdToGridMap) {
                     if (mapping.second.center.getX() == x && mapping.second.center.getY() == y) {
                         uint32_t stateId = mapping.first;
@@ -184,7 +184,7 @@ void Environment::print_Environment() const {
                         } else {
                             cell = 'A' + (stateId - 10);
                         }
-                        isCenter = true;
+                        // isCenter = true;
                         break;
                     }
                 }

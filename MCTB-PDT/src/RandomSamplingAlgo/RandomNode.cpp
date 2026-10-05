@@ -80,6 +80,15 @@ void Random_Node::setTimes(const std::vector<uint16_t>& newTimes) {
     setCurmakespan();
 }
 
+// Positions getters and setters
+const std::vector<Point>& Random_Node::getPositions() const {
+    return positions;
+}
+
+void Random_Node::setPositions(const std::vector<Point>& newPositions) {
+    positions = newPositions;
+}
+
 // Current makespan getters and setters
 uint16_t Random_Node::getCurmakespan() const {
     return curmakespan;

@@ -6,10 +6,16 @@
 #include <string>
 #include <cstdlib>
 #include <algorithm>
-#include "Environment/Environment.h"
-#include "MultiRobotSystem/MultiRobotSystem.h"
-#include "LTLFormula/LTLFormula.h"
-#include "../Automatons/BuchiAutomaton.h"
+#include "../include/TaskAllocationAlgorithms.h"
+#include "../include/Environment/gridvis.h"
+#include "../include/Tree/PlanningDecisionTree.h"
+#include "../include/Tree/Tree_Node.h"
+#include "../include/Environment/Environment.h"
+#include "../include/MultiRobotSystem/MultiRobotSystem.h"
+#include "../include/LTLFormula/LTLFormula.h"
+#include "../include/TestRunManager.h"
+#include "../../Automatons/BuchiAutomaton.h"
+#include "../../Automatons/ProductAutomaton.h"
 #include "RandomSamplingAlgo/RandomSamplingTaskAllocation.h"
 #include "RandomSamplingAlgo/RandomNode.h"
 
@@ -48,12 +54,14 @@ MultiRobotSystem* createTestMultiRobotSystem2();
 MultiRobotSystem* createNoCameraMultiRobotSystem();
 BuchiAutomaton* createTestBuchiAutomaton();
 BuchiAutomaton* createTestBuchiAutomaton2();
+BuchiAutomaton* createTestBuchiAutomaton3();
 BuchiAutomaton* createInitialAcceptingBuchiAutomaton();
 void cleanup(BuchiAutomaton* buchi, MultiRobotSystem* mrs, Environment* env, TS* ts, GridWorld* grid);
 
 // Independent reference helpers (do not call the code under test)
 map<uint16_t, vector<uint16_t>> snapshotEdges(BuchiAutomaton* buchi);
 uint16_t referenceMinLength(BuchiAutomaton* buchi, uint16_t srcId, uint16_t goalId);
+vector<vector<uint16_t>> edgeAPSets(BuchiAutomaton* buchi, uint16_t srcId, uint16_t dstId);
 bool apSetCoveredByTeam(BuchiAutomaton* buchi, MultiRobotSystem* mrs, uint16_t ap, const vector<uint8_t>& robots);
 bool edgeIsDeterministicallyFeasible(BuchiAutomaton* buchi, MultiRobotSystem* mrs, uint16_t srcId, uint16_t dstId);
 bool validateStep(BuchiAutomaton* searchNBA, MultiRobotSystem* mrs, uint16_t srcId, uint16_t dstId,
@@ -61,6 +69,11 @@ bool validateStep(BuchiAutomaton* searchNBA, MultiRobotSystem* mrs, uint16_t src
 bool validatePath(const TaskAllocPath& p, BuchiAutomaton* searchNBA, MultiRobotSystem* mrs,
                   uint16_t startId, uint16_t goalId, bool isCycle, string& err);
 void printAutomaton(BuchiAutomaton* buchi, const string& name);
+
+// Reports what the planner actually produced, rather than asserting anything about it
+void printTaskAllocPath(const string& label, const TaskAllocPath& p);
+void printPlan(RandomSamplingTaskAllocation& sampler);
+void runPlannerShowcase();
 
 int main() {
     srand(12345);  // Fixed seed so failures are reproducible
@@ -87,13 +100,16 @@ int main() {
     cout << "\n--- Test 7: run() on an infinite NBA (runInfinitePathPlanner) ---" << endl;
     testRunInfinitePlanner();
 
-    cout << "\n--- Test 8: Accepting initial state needs no prefix ---" << endl;
+    cout << "\n--- Test 8: Accepting initial state still walks a first cycle ---" << endl;
     testInitialStateAccepting();
 
     cout << "\n--- Test 9: Time limit stops sampling ---" << endl;
     testTimeLimitStopsSampling();
 
     cout << "\n=== SUMMARY: " << numPassed << " passed, " << numFailed << " failed ===" << endl;
+
+    runPlannerShowcase();
+
     return numFailed == 0 ? 0 : 1;
 }
 
@@ -182,7 +198,10 @@ void testPruneInfeasibleNBAPaths() {
         for (const auto& [id, dsts] : original) {
             for (uint16_t d : dsts) {
                 bool kept = find(prunedEdges[id].begin(), prunedEdges[id].end(), d) != prunedEdges[id].end();
-                bool unconstrained = reference->getTrueAPs(id, d).empty();
+                // An edge requires no tasks when one of its conjunctions has no APs at all
+                vector<vector<uint16_t>> refSets = edgeAPSets(reference, id, d);
+                bool unconstrained = any_of(refSets.begin(), refSets.end(),
+                                            [](const vector<uint16_t>& s) { return s.empty(); });
                 bool feasible = edgeIsDeterministicallyFeasible(reference, c.mrs, id, d);
                 if (unconstrained) { if (!kept) unconstrainedRemoved++; }
                 else if (feasible && !kept) wronglyRemoved++;
@@ -280,22 +299,6 @@ void testGetRandomFeasibleTaskAllocation() {
     CHECK(edgesTested > 0, "found feasible edges to test (" + to_string(edgesTested) + ")");
     CHECK(invalid == 0, "every allocation over " + to_string(NUM_TRIALS) + " trials per edge is valid" +
           (invalid ? " (first error: " + firstErr + ")" : ""));
-
-    // getRandomAllocation assigns each robot to at most one AP
-    vector<uint16_t> apSet = {1, 3, 5};
-    bool disjoint = true, sized = true;
-    for (int t = 0; t < NUM_TRIALS; t++) {
-        auto alloc = sampler.getRandomAllocation(apSet);
-        if (alloc.size() != apSet.size()) sized = false;
-        set<uint8_t> seen;
-        for (const auto& team : alloc) {
-            for (uint8_t r : team) {
-                if (r >= mrs->getNumRobots() || !seen.insert(r).second) disjoint = false;
-            }
-        }
-    }
-    CHECK(sized, "getRandomAllocation returns one team per AP");
-    CHECK(disjoint, "getRandomAllocation uses valid robot indices and never assigns a robot twice");
 
     cleanup(buchi, mrs, env, ts, grid);
 }
@@ -398,7 +401,7 @@ void testRunFinitePlanner() {
     TS* ts = nullptr; GridWorld* grid = nullptr; Environment* env = nullptr;
     createTestSystemComponents2(ts, grid, env);
     MultiRobotSystem* mrs = createTestMultiRobotSystem2();
-    BuchiAutomaton* buchi = createTestBuchiAutomaton2();
+    BuchiAutomaton* buchi = createTestBuchiAutomaton3();
     CHECK(buchi->isFinite(), "fixture NBA is finite");
 
     // Iteration constructor alone should run the requested number of iterations
@@ -449,6 +452,11 @@ void testRunInfinitePlanner() {
     BuchiAutomaton* buchi = createTestBuchiAutomaton();
     CHECK(buchi->isInfinite(), "fixture NBA is infinite");
 
+    // State 0 is both the initial state and accepting here, so its lasso is a bare suffix
+    const auto& fixtureAccepting = buchi->getAcceptingStates();
+    CHECK(find(fixtureAccepting.begin(), fixtureAccepting.end(), buchi->getInitialState()) != fixtureAccepting.end(),
+          "fixture NBA has an accepting initial state");
+
     {
         RandomSamplingTaskAllocation sampler(buchi, env, mrs, (uint16_t)20);
         sampler.run();
@@ -465,7 +473,7 @@ void testRunInfinitePlanner() {
     CHECK(sampler.getIterations() == 200, "runs 200 iterations when both limits are set (ran " +
           to_string(sampler.getIterations()) + ")");
 
-    int withPlan = 0;
+    int withPlan = 0, initialAcceptingPlans = 0;
     for (uint16_t acc : pruned->getAcceptingStates()) {
         const auto& [prefix, suffix] = sampler.getPath(acc);
         bool reachable = acc == initialId || referenceMinLength(pruned, initialId, acc) > 0;
@@ -483,7 +491,16 @@ void testRunInfinitePlanner() {
         CHECK(sufOk, "accepting " + to_string(acc) + ": suffix is a valid cycle" + (sufOk ? "" : " (" + err + ")"));
         CHECK(suffix.pathLength <= pruned->getNumStates() + 1, "accepting " + to_string(acc) + ": suffix length is within bound");
         if (acc == initialId) {
-            CHECK(prefix.path.empty(), "accepting " + to_string(acc) + ": is the initial state, so prefix is empty");
+            initialAcceptingPlans++;
+            // Starting on the accepting state is not a visit to it, so the run still owes a first
+            // loop. The prefix is therefore a cycle, and the lasso reaches the state twice over.
+            string pcerr;
+            bool preCycleOk = validatePath(prefix, pruned, mrs, acc, acc, true, pcerr);
+            CHECK(preCycleOk, "accepting " + to_string(acc) +
+                  ": is the initial state, so the prefix is a first cycle" +
+                  (preCycleOk ? "" : " (" + pcerr + ")"));
+            CHECK(prefix.pathLength >= 2, "accepting " + to_string(acc) +
+                  ": the first cycle takes at least one step");
         } else {
             string perr;
             bool preOk = validatePath(prefix, pruned, mrs, initialId, acc, false, perr);
@@ -491,6 +508,10 @@ void testRunInfinitePlanner() {
         }
     }
     CHECK(withPlan > 0, "at least one accepting state is reachable and on a cycle (" + to_string(withPlan) + ")");
+    // Guards against the accepting-initial branch above passing vacuously if state 0 stops
+    // being planned for, e.g. because pruning leaves it off every cycle
+    CHECK(initialAcceptingPlans > 0, "the accepting initial state was planned for (" +
+          to_string(initialAcceptingPlans) + ")");
 
     cleanup(buchi, mrs, env, ts, grid);
 }
@@ -510,10 +531,15 @@ void testInitialStateAccepting() {
         sampler.setTimeLimit(30.0);
         sampler.run();
         const auto& [prefix, suffix] = sampler.getPath(initialId);
-        CHECK(prefix.path.empty() && prefix.pathLength == 0, "no prefix is built for the accepting initial state");
+        string perr;
+        bool preOk = validatePath(prefix, sampler.getPrunedNBA(), mrs, initialId, initialId, true, perr);
+        CHECK(preOk, "a first cycle is built as the prefix" + (preOk ? string("") : " (" + perr + ")"));
         string err;
         bool ok = validatePath(suffix, sampler.getPrunedNBA(), mrs, initialId, initialId, true, err);
         CHECK(ok, "a valid suffix cycle is built from the initial state" + (ok ? string("") : " (" + err + ")"));
+        // Both halves are cycles on the same state, so the run visits it twice after starting there
+        CHECK(prefix.pathLength >= 2 && suffix.pathLength >= 2,
+              "the lasso visits the accepting state twice after the start");
     }
 
     cleanup(buchi, mrs, env, ts, grid);
@@ -577,7 +603,7 @@ bool apSetCoveredByTeam(BuchiAutomaton* buchi, MultiRobotSystem* mrs, uint16_t a
     vector<bool> required = buchi->getLTLFormula()->getRequiredCapabilities(ap);
     vector<bool> combined(required.size(), false);
     for (uint8_t r : robots) {
-        vector<bool> caps = mrs->getRobotCapabilities(r + 1);  // robot IDs are 1-based
+        vector<bool> caps = mrs->getRobotCapabilities(r);  // teams already carry 1-based ids
         for (size_t j = 0; j < caps.size() && j < combined.size(); j++) combined[j] = combined[j] || caps[j];
     }
     for (size_t j = 0; j < required.size(); j++) {
@@ -586,14 +612,38 @@ bool apSetCoveredByTeam(BuchiAutomaton* buchi, MultiRobotSystem* mrs, uint16_t a
     return true;
 }
 
-// getTrueAPs only returns single-AP sets, so an edge is feasible when the whole team covers some AP
+// Read AP sets off the edges directly, as the sampler does. BuchiAutomaton::getTrueAPs drops
+// multi-AP conjunctions, which the sampler does serve, so it cannot be the reference here.
+vector<vector<uint16_t>> edgeAPSets(BuchiAutomaton* buchi, uint16_t srcId, uint16_t dstId) {
+    vector<vector<uint16_t>> sets;
+    Node* src = buchi->getNode(srcId);
+    if (!src) return sets;
+    for (const Edge& e : src->getEdgestoNode(dstId)) {
+        for (const auto& apSet : e.getTrueAPs()) sets.push_back(apSet);
+    }
+    return sets;
+}
+
+// An edge is feasible when at least one of its conjunctions can be served by the team. A robot
+// serves one proposition only, so for every capability the conjunction needs there must be at
+// least as many robots carrying it as there are propositions requiring it.
 bool edgeIsDeterministicallyFeasible(BuchiAutomaton* buchi, MultiRobotSystem* mrs, uint16_t srcId, uint16_t dstId) {
-    vector<uint8_t> allRobots;
-    for (uint8_t r = 0; r < mrs->getNumRobots(); r++) allRobots.push_back(r);
-    for (const auto& apSet : buchi->getTrueAPs(srcId, dstId)) {
+    map<size_t, int> supply;
+    for (uint8_t r = 0; r < mrs->getNumRobots(); r++) {
+        vector<bool> caps = mrs->getRobotCapabilities(r + 1);  // robot IDs are 1-based
+        for (size_t j = 0; j < caps.size(); j++) {
+            if (caps[j]) supply[j]++;
+        }
+    }
+    for (const auto& apSet : edgeAPSets(buchi, srcId, dstId)) {
+        map<size_t, int> demand;
         bool all = true;
         for (uint16_t ap : apSet) {
-            if (!apSetCoveredByTeam(buchi, mrs, ap, allRobots)) { all = false; break; }
+            vector<bool> required = buchi->getLTLFormula()->getRequiredCapabilities(ap);
+            for (size_t j = 0; j < required.size() && all; j++) {
+                if (required[j] && ++demand[j] > supply[j]) all = false;
+            }
+            if (!all) break;
         }
         if (all) return true;
     }
@@ -602,7 +652,7 @@ bool edgeIsDeterministicallyFeasible(BuchiAutomaton* buchi, MultiRobotSystem* mr
 
 bool validateStep(BuchiAutomaton* searchNBA, MultiRobotSystem* mrs, uint16_t srcId, uint16_t dstId,
                   const vector<vector<uint8_t>>& robotsByAP, const vector<uint16_t>& satisfiedAPs, string& err) {
-    auto options = searchNBA->getTrueAPs(srcId, dstId);
+    auto options = edgeAPSets(searchNBA, srcId, dstId);
     if (find(options.begin(), options.end(), satisfiedAPs) == options.end()) {
         err = "satisfied AP set is not one of the edge's AP sets"; return false;
     }
@@ -610,7 +660,7 @@ bool validateStep(BuchiAutomaton* searchNBA, MultiRobotSystem* mrs, uint16_t src
     set<uint8_t> used;
     for (size_t i = 0; i < satisfiedAPs.size(); i++) {
         for (uint8_t r : robotsByAP[i]) {
-            if (r >= mrs->getNumRobots()) { err = "robot index out of range"; return false; }
+            if (r < 1 || r > mrs->getNumRobots()) { err = "robot id out of range"; return false; }
             if (!used.insert(r).second) { err = "robot assigned to two APs"; return false; }
         }
         if (!apSetCoveredByTeam(searchNBA, mrs, satisfiedAPs[i], robotsByAP[i])) {
@@ -676,26 +726,58 @@ void cleanup(BuchiAutomaton* buchi, MultiRobotSystem* mrs, Environment* env, TS*
  * Create test environment with TS and GridWorld
  */
 void createTestSystemComponents2(TS*& ts, GridWorld*& grid, Environment*& env) {
-    grid = new GridWorld(21, 21);
+    // Allocate GridWorld
+    grid = new GridWorld(210, 210);
+    cout << "✓ GridWorld created (210x210)" << endl;
+    
+    // Allocate Transition System
     ts = new TS();
+    
+    // Add 6 states 
+    Node* node0 = new Node(0, "R0");
+    Node* node1 = new Node(1, "R1");
+    Node* node2 = new Node(2, "R2");
+    Node* node3 = new Node(3, "R3");
+    Node* node4 = new Node(4, "R4");
+    Node* node5 = new Node(5, "R5");
 
-    // 6 states with edges: 0-2 1-2 2-3 2-4 2-5
-    vector<Node*> nodes;
-    for (uint16_t i = 0; i < 6; i++) nodes.push_back(new Node(i, "R" + to_string(i)));
-    for (uint16_t i : {0, 1, 3, 4, 5}) {
-        nodes[i]->addEdge(Edge(2));
-        nodes[2]->addEdge(Edge(i));
-    }
-    for (Node* n : nodes) ts->add_Node(n);
+    //with edges: 0-2 1-2 2-3 2-4 2-5
+    node0->addEdge(Edge(2));
+    node2->addEdge(Edge(0));
+    node1->addEdge(Edge(2));
+    node2->addEdge(Edge(1));
+    node3->addEdge(Edge(2));
+    node2->addEdge(Edge(3));
+    node4->addEdge(Edge(2));
+    node2->addEdge(Edge(4));
+    node5->addEdge(Edge(2));
+    node2->addEdge(Edge(5));
+    
+    // Add nodes to TS
+    ts->add_Node(node0);
+    ts->add_Node(node1);
+    ts->add_Node(node2);
+    ts->add_Node(node3);
+    ts->add_Node(node4);
+    ts->add_Node(node5);
     ts->setInitial(0);
-
+    
+    cout << "✓ Transition System created" << endl;
+    cout << "  - States: " << ts->getNumStates() << endl;
+    cout << "  - Initial state: 0" << endl;
+    
+    // Allocate Environment
     env = new Environment(ts, grid);
-    env->mapTSStateToGrid(0, Point(18, 14), 5, 14);
-    env->mapTSStateToGrid(1, Point(18, 4), 5, 7);
-    env->mapTSStateToGrid(2, Point(10, 10), 6, 20);
-    env->mapTSStateToGrid(3, Point(5, 3), 5, 18);
-    env->mapTSStateToGrid(4, Point(5, 10), 5, 11);
-    env->mapTSStateToGrid(5, Point(5, 15), 5, 4);
+    cout << "✓ Environment created" << endl;
+    
+    // Map states to grid regions
+    env->mapTSStateToGrid(0, Point(180, 140), 50, 140);    // State 0 centered at (180,140)
+    env->mapTSStateToGrid(1, Point(180, 40), 50, 70);   // State 1 centered at (180,40)
+    env->mapTSStateToGrid(2, Point(100, 100), 60, 200);   // State 2 centered at (100,100)
+    env->mapTSStateToGrid(3, Point(50, 30), 50, 180);   // State 3 centered at (50,30)
+    env->mapTSStateToGrid(4, Point(50, 100), 50, 110);   // State 4 centered at (50,100)
+    env->mapTSStateToGrid(5, Point(50, 150), 50, 40);   // State 5 centered at (50,150)
+    cout << "✓ Mapped 6 states to grid regions" << endl;
 }
 
 /**
@@ -705,7 +787,9 @@ MultiRobotSystem* createTestMultiRobotSystem2() {
     MultiRobotSystem* mrs = new MultiRobotSystem();
     RobotCapability caps[] = {RobotCapability::SENSOR_GPS, RobotCapability::MOVEMENT_GROUND, RobotCapability::SENSOR_CAMERA};
     for (uint32_t id = 1; id <= 6; id++) {
-        Robot* r = new Robot(id, "Rover_" + to_string(id), Point((id - 1) % 3, 1));
+         int col = (id - 1) % 3;  // 0-2 horizontal
+        int row = (id - 1) / 3;  // 0-4 vertical
+        Robot* r = new Robot(id, "Rover_" + to_string(id), Point(180+col, 140+row));
         r->initializeCapabilities(13);
         r->enableCapability(caps[(id - 1) % 3]);
         mrs->addRobot(r);
@@ -720,7 +804,9 @@ MultiRobotSystem* createNoCameraMultiRobotSystem() {
     MultiRobotSystem* mrs = new MultiRobotSystem();
     RobotCapability caps[] = {RobotCapability::SENSOR_GPS, RobotCapability::MOVEMENT_GROUND};
     for (uint32_t id = 1; id <= 4; id++) {
-        Robot* r = new Robot(id, "Rover_" + to_string(id), Point((id - 1) % 2, 1));
+        int col = (id - 1) % 3;  // 0-2 horizontal
+        int row = (id - 1) / 3;  // 0-1
+        Robot* r = new Robot(id, "Rover_" + to_string(id), Point(180+col, 140+row));
         r->initializeCapabilities(13);
         r->enableCapability(caps[(id - 1) % 2]);
         mrs->addRobot(r);
@@ -742,20 +828,31 @@ BuchiAutomaton* createTestBuchiAutomaton() {
 }
 
 /**
- * Finite NBA: F p1 && F p4 && F p5 && F p3
+ * infinite NBA: F p1 && F p4 && F p5 && F p3
  */
 BuchiAutomaton* createTestBuchiAutomaton2() {
-    string ltl_str = "(F\"p1\" && F\"p4\" && F\"p5\" && F\"p3\")";
+    string ltl_str = "G(F(\"p1\")) && G(F(\"p4\")) && G(F(\"p5\"))";
     vector<BatchAtomicProposition> batchAPs;
-    batchAPs.push_back(BatchAtomicProposition(0, 0, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));   // p0: needs 0,5
     batchAPs.push_back(BatchAtomicProposition(1, 1, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));   // p1: needs 0,5
-    batchAPs.push_back(BatchAtomicProposition(2, 2, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));   // p2: needs 3,5
-    batchAPs.push_back(BatchAtomicProposition(3, 3, {true, false, false, true, false, true, false, false, false, false, false, false, false}, 0));    // p3: needs 0,3,5
     batchAPs.push_back(BatchAtomicProposition(4, 4, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));   // p4: needs 3,5
     batchAPs.push_back(BatchAtomicProposition(5, 5, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));   // p5: needs 0,5
     LTLFormula* ltlFormula = new LTLFormula(ltl_str, batchAPs);
     return new BuchiAutomaton(ltlFormula);
 }
+
+/**
+ * Finite NBA: F p1 && F p4 && F p5 && F p3
+ */
+BuchiAutomaton* createTestBuchiAutomaton3() {
+    string ltl_str = "(F(\"p1\")) && (F(\"p4\")) && (F(\"p5\"))";
+    vector<BatchAtomicProposition> batchAPs;
+    batchAPs.push_back(BatchAtomicProposition(1, 1, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));   // p1: needs 0,5
+    batchAPs.push_back(BatchAtomicProposition(4, 4, {false, false, false, true, false, true, false, false, false, false, false, false, false}, 0));   // p4: needs 3,5
+    batchAPs.push_back(BatchAtomicProposition(5, 5, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));   // p5: needs 0,5
+    LTLFormula* ltlFormula = new LTLFormula(ltl_str, batchAPs);
+    return new BuchiAutomaton(ltlFormula);
+}
+
 
 /**
  * Infinite NBA whose initial state should be accepting: G F p0
@@ -766,4 +863,127 @@ BuchiAutomaton* createInitialAcceptingBuchiAutomaton() {
     batchAPs.push_back(BatchAtomicProposition(0, 0, {true, false, false, false, false, true, false, false, false, false, false, false, false}, 0));   // p0: needs 0,5
     LTLFormula* ltlFormula = new LTLFormula(ltl_str, batchAPs);
     return new BuchiAutomaton(ltlFormula);
+}
+
+// ============================================================================
+// PLANNER SHOWCASE - prints what the planner produced, asserts nothing
+// ============================================================================
+
+void printTaskAllocPath(const string& label, const TaskAllocPath& p) {
+    if (p.path.empty()) {
+        cout << "      " << label << ": none" << endl;
+        return;
+    }
+    cout << "      " << label << " (" << p.pathLength << " states, makespan " << p.makespan << "): ";
+    for (size_t k = 0; k < p.path.size(); k++) {
+        if (k) cout << " -> ";
+        cout << p.path[k]->getautomatonState()->getId();
+    }
+    cout << endl;
+
+    // Node 0 is the starting state, so the transitions start at index 1
+    for (size_t k = 1; k < p.path.size(); k++) {
+        Random_Node* n = p.path[k];
+        const vector<uint16_t>& aps = n->getTrueAPs();
+        const vector<vector<uint8_t>>& teams = n->getTaskAllocations();
+        cout << "        step " << k << " -> state " << n->getautomatonState()->getId() << ": ";
+        if (aps.empty()) {
+            cout << "no tasks";
+        } else {
+            for (size_t a = 0; a < aps.size(); a++) {
+                if (a) cout << ", ";
+                cout << "p" << aps[a] << " <- {";
+                if (a < teams.size()) {
+                    for (size_t t = 0; t < teams[a].size(); t++) {
+                        if (t) cout << " ";
+                        cout << "r" << (int)teams[a][t];
+                    }
+                }
+                cout << "}";
+            }
+        }
+        cout << "  (step makespan " << n->getCurmakespan() << ")" << endl;
+    }
+}
+
+void printPlan(RandomSamplingTaskAllocation& sampler) {
+    BuchiAutomaton* pruned = sampler.getPrunedNBA();
+    size_t edgeCount = 0;
+    for (const auto& nodePair : pruned->getNodes()) edgeCount += nodePair.second->getEdges().size();
+
+    cout << "  ran " << sampler.getIterations() << " iterations in "
+         << sampler.getComputationTime() << " s" << endl;
+    cout << "  pruned NBA: " << pruned->getNumStates() << " states, " << edgeCount
+         << " edges, initial " << pruned->getInitialState() << ", accepting {";
+    for (uint16_t a : pruned->getAcceptingStates()) cout << " " << a;
+    cout << " }" << endl;
+
+    for (const auto& [acc, plan] : sampler.getAllPaths()) {
+        const TaskAllocPath& prefix = plan.first;
+        const TaskAllocPath& suffix = plan.second;
+        bool planned = !prefix.path.empty() || !suffix.path.empty();
+        cout << "\n    accepting state " << acc;
+        if (planned) {
+            cout << "  (lasso makespan " << (prefix.makespan + suffix.makespan) << ")" << endl;
+        } else {
+            cout << "  (no plan found)" << endl;
+        }
+        printTaskAllocPath("prefix", prefix);
+        printTaskAllocPath("suffix", suffix);
+    }
+}
+
+void runPlannerShowcase() {
+    cout << "\n\n================================================================================" << endl;
+    cout << "PLANNER OUTPUT: 3 specifications x 2 budgets" << endl;
+    cout << "================================================================================" << endl;
+
+    struct Spec {
+        const char* name;
+        const char* formula;
+        BuchiAutomaton* (*make)();
+    };
+    const Spec specs[] = {
+        {"Buchi 1", "G F p0 && G F (p1 & X p2)",   createTestBuchiAutomaton},
+        {"Buchi 2", "G F p1 && G F p4 && G F p5",  createTestBuchiAutomaton2},
+        {"Buchi 3", "F p1 && F p4 && F p5",        createTestBuchiAutomaton3},
+    };
+
+    for (const Spec& spec : specs) {
+        for (int mode = 0; mode < 2; mode++) {
+            TS* ts = nullptr; GridWorld* grid = nullptr; Environment* env = nullptr;
+            createTestSystemComponents2(ts, grid, env);
+            MultiRobotSystem* mrs = createTestMultiRobotSystem2();
+            BuchiAutomaton* buchi = spec.make();
+
+            cout << "\n--------------------------------------------------------------------------------" << endl;
+            cout << spec.name << ":  " << spec.formula
+                 << "   [" << (buchi->isFinite() ? "finite" : "infinite") << ", "
+                 << (int)mrs->getNumRobots() << " robots]" << endl;
+            cout << "budget: " << (mode == 0 ? "1000 iterations" : "2 seconds") << endl;
+
+            if (mode == 0) {
+                //run random sampler
+                RandomSamplingTaskAllocation sampler(buchi, env, mrs, (uint16_t)1000);
+                sampler.run();
+                printPlan(sampler);
+                // Create and run TaskAllocationAlgorithm to compare
+                TaskAllocationAlgorithms* allocAlg = new TaskAllocationAlgorithms(buchi, env, mrs);
+          
+                //build the planning decision tree
+                allocAlg->intensiveInterTaskRelationshipTreeSearch(buchi, env, mrs);
+                //visualize the optimal path for certain configurations and automata
+                    allocAlg->visualizeOptimalPath(string("output/automaton_test_") + spec.formula);
+                    allocAlg->visualizeTree(string("output/automaton_test_") + spec.formula + string("_tree"));
+                allocAlg->getMetrics().printSummary();
+            } else {
+                RandomSamplingTaskAllocation sampler(buchi, env, mrs, (double)2.0);
+                sampler.run();
+                printPlan(sampler);
+            }
+
+            cleanup(buchi, mrs, env, ts, grid);
+        }
+    }
+    cout << "\n================================================================================" << endl;
 }

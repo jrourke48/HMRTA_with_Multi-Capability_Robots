@@ -35,6 +35,8 @@ class RandomSamplingTaskAllocation {
         uint16_t Iterations; // Number of iterations for random sampling
         double timeLimit; // Time limit for random sampling
         double computationTime; // Time taken for the computation
+        std::vector<Point> initialPositions; // Robot placements when planning began, snapshotted
+                                             // once so sampling never reads the team's live state
 
     public:
         // Constructor with iteration parameter
@@ -59,7 +61,20 @@ class RandomSamplingTaskAllocation {
 
         //Incrementally build a random path (or cycle if srcNode == goalNode) of at most targetLength nodes
         //returns an empty path if the goal is not reached or the makespan exceeds makespanBound
-        TaskAllocPath buildRandomPath(BuchiAutomaton* searchNBA, Node* srcNode, Node* goalNode, uint16_t targetLength, bool hasBound, uint16_t makespanBound);
+        //startTimes and startPositions carry the robot clocks and placements the path continues from,
+        //so a suffix picks up where its prefix left off; empty means start fresh
+        TaskAllocPath buildRandomPath(BuchiAutomaton* searchNBA, Node* srcNode, Node* goalNode, uint16_t targetLength,
+                                      bool hasBound, uint16_t makespanBound,
+                                      const std::vector<uint16_t>& startTimes = {},
+                                      const std::vector<Point>& startPositions = {});
+
+        //Advance one step: every robot serving an AP travels to that AP's region, and the robots on
+        //the same AP are synchronised to the last arrival, since the task is not done until all arrive
+        void applyStep(const std::vector<uint16_t>& apSet,
+                       const std::vector<std::vector<uint8_t>>& teams,
+                       std::vector<uint16_t>& times,
+                       std::vector<Point>& positions) const;
+
 
         //========================
         // SETTERS AND GETTERS
@@ -80,8 +95,6 @@ class RandomSamplingTaskAllocation {
         const std::map<uint16_t, std::pair<TaskAllocPath, TaskAllocPath>>& getAllPaths() const;
         // Add a new path for a specific accepting state 
         void addPath(uint16_t acceptingState, TaskAllocPath prePath, TaskAllocPath sufPath);
-        //add a new path for an accepting state that is the initial state meaning no prefix needed
-        void addNoPrePath(uint16_t acceptingState, TaskAllocPath sufPath);
         //add a new path for a finite NBA meaning no suffix is needed
         void addNoSufPath(uint16_t acceptingState, TaskAllocPath prePath);
 
@@ -110,5 +123,11 @@ class RandomSamplingTaskAllocation {
         //get random feasible task allocation - returns (robotsByAP, satisfiedTrueAPs)
         //robotsByAP[i] = vector of robot indices assigned to satisfy apSet[i]
         std::pair<std::vector<std::vector<uint8_t>>, std::vector<uint16_t>> getRandomFeasibleTaskAllocation(Node* curNode, Node* newNode);
-        std::vector<std::vector<uint8_t>> getRandomAllocation(std::vector<uint16_t> apSet);
+
+        //Assign a disjoint team of robots to every AP of a conjunction, so that each team covers
+        //its AP's required capabilities. Robots are considered in random order, so repeated calls
+        //give different assignments, but the search is exhaustive: it returns false only when no
+        //assignment exists. Both pruning and allocation ask this same question.
+        bool assignTeamsToConjunction(const std::vector<uint16_t>& apSet,
+                                      std::vector<std::vector<uint8_t>>& robotsByAP) const;
 };

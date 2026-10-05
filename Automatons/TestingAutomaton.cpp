@@ -27,6 +27,15 @@
 #include "LTLFormula/LTLFormula.h"
 #include "LTLFormula/BatchAtomicProposition.h"
 #include "../MCTB-PDT/include/TaskAllocationAlgorithms.h"
+#include <chrono>
+#include <sys/resource.h>
+
+// Get memory usage in MB
+double getMemoryUsageMB() {
+    struct rusage r_usage;
+    getrusage(RUSAGE_SELF, &r_usage);
+    return (double)r_usage.ru_maxrss / 1024.0;  // Convert from KB to MB
+}
 
 int main()
 {
@@ -170,11 +179,19 @@ int main()
             mrs2->addRobot(robot);
 
           
-            
-
+            //buld the product automaton and store its metrics
+            double memBeforeProduct = getMemoryUsageMB();
+            double startTimeProduct = std::chrono::high_resolution_clock::now().time_since_epoch().count();
             // Create ProductAutomaton
             ProductAutomaton productAutomaton(*env, *mrs2, *buchi);
-            
+            // Test OptimalAcceptingPath algorithm
+            std::tuple<std::vector<uint16_t>, uint32_t> result = productAutomaton.OptimalAcceptingPath();
+            std::vector<uint16_t> path = std::get<0>(result);
+            double memAfterProduct = getMemoryUsageMB();
+            double endTimeProduct = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+            double memUsedProduct = memAfterProduct - memBeforeProduct;
+
+            // Statistics for the product automaton
             unsigned long numStates = productAutomaton.getNumStates();
             unsigned long numEdges = productAutomaton.getNumEdges();
             unsigned long acceptingStates = productAutomaton.getAcceptingStates().size();
@@ -189,19 +206,7 @@ int main()
                     << numEdges << "," 
                     << acceptingStates << "," 
                     << stateRatio << "\n";
-                
-            if (true) {
-                // Visualize the Spot product automaton
-                std::ofstream dotFile("output/testing_product_automaton_2robots.dot");
-                spot::print_dot(dotFile, productAutomaton.getSpotAutomaton());
-                dotFile.close();
-                std::cout << "  ✓ Product automaton visualization saved to output/testing_product_automaton_2robots.dot\n";
-            }
-            // Test OptimalAcceptingPath algorithm
-            std::cout << "  Testing OptimalAcceptingPath... ";
-            std::tuple<std::vector<uint16_t>, uint32_t> result = productAutomaton.OptimalAcceptingPath();
-            std::vector<uint16_t> path = std::get<0>(result);
-            
+
             if (!path.empty()) {
                 std::cout << "✓ Found path of length " << path.size() << ": ";
                 
@@ -226,22 +231,30 @@ int main()
                     // Create TaskAllocationAlgorithms
                     TaskAllocationAlgorithms* allocAlg = new TaskAllocationAlgorithms(buchi, env, mrs2);
                     
+                    // Measure memory 
+                    double memBefore = getMemoryUsageMB();
                     //build the planning decision tree
                     allocAlg->intensiveInterTaskRelationshipTreeSearch(buchi, env, mrs2);
-                    allocAlg->visualizeTree("planning_decision_tree.png");
-                    allocAlg->visualizeOptimalPath("optimal_path.png");
+                    allocAlg->visualizeTree("planning_decision_tree");
+                    allocAlg->visualizeOptimalPath("optimal_path");
+                    double memAfter = getMemoryUsageMB();
+                    double memUsed = memAfter - memBefore;
+                    allocAlg->getMetrics().setTaskMemoryUsageMB(memUsed);
+
                     //add the full product automaton metrics to the algorithm metrics
                     allocAlg->getMetrics().setFullProductAutomatonMetrics(
                         productAutomaton.getNumStates(),
                         productAutomaton.getNumEdges(),
                         std::get<1>(result),
-                        1000,
-                        10
+                        (endTimeProduct - startTimeProduct) / 1e6,  // convert from nanoseconds to milliseconds
+                        memUsedProduct
                     );
+                
                     allocAlg->getMetrics().computeDerivedMetrics();
                     allocAlg->getMetrics().printSummary();
-                    delete allocAlg;
+                    delete allocAlg;                    
                 }
+                
                 if (visitsAccepting) {
                     std::cout << " ✓ (Total weight: " << std::get<1>(result) << ")" << std::endl;
                 } else {
