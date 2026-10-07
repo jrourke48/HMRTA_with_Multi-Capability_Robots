@@ -16,6 +16,7 @@
 #include "../include/TestRunManager.h"
 #include "../../Automatons/BuchiAutomaton.h"
 #include "../../Automatons/ProductAutomaton.h"
+#include "../include/RandomSamplingAlgo/RandomSamplingTaskAllocation.h"
 
 using namespace std;
 //=================================================================================
@@ -23,6 +24,13 @@ using namespace std;
 //=================================================================================
 //Environments: 3-robot, 6-robot, 15-robot, and 45-robot all with 6 TS regions each with only one capability per robot
 //
+
+// The sampler is given a multiple of the tree planner's own runtime on the same instance, so the
+// two are compared at a proportional compute budget rather than an arbitrary fixed one
+static const double SAMPLER_BUDGET_MULTIPLIER = 100.0;
+// A tree search too fast to measure would leave the budget at zero, which the sampler reads as
+// "no limit" and would never stop on
+static const double SAMPLER_MIN_SECONDS = 0.01;
 
 // Forward declarations
 void createTestEnvironment3(TS*& ts, GridWorld*& grid, Environment*& env, MultiRobotSystem*& mrs);
@@ -146,11 +154,8 @@ int main() {
                     //buld the product automaton and store its metrics
                     double memBeforeProduct = getMemoryUsageMB();
                     double startTimeProduct = std::chrono::high_resolution_clock::now().time_since_epoch().count();
-                    std::cout << "DEBUG: Creating ProductAutomaton for automaton " << automatonId << "..." << std::endl;
                     ProductAutomaton productAutomaton(*env, *mrs, *buchi);
-                    std::cout << "DEBUG: ProductAutomaton created successfully. Calling OptimalAcceptingPath()..." << std::endl;
                     std::tuple<std::vector<uint16_t>, uint32_t> optimalPath = productAutomaton.OptimalAcceptingPath();
-                    std::cout << "DEBUG: OptimalAcceptingPath() completed successfully" << std::endl;
                     double memAfterProduct = getMemoryUsageMB();
                     double endTimeProduct = std::chrono::high_resolution_clock::now().time_since_epoch().count();
                     double memUsedProduct = memAfterProduct - memBeforeProduct;
@@ -163,12 +168,35 @@ int main() {
                         (endTimeProduct - startTimeProduct) / 1e6,  // convert from nanoseconds to milliseconds
                         memUsedProduct
                     );
-                    // Compute derived metrics after setting full product automaton metrics
-                    allocAlg->getMetrics().computeDerivedMetrics();
                 }
 
+                // The sampler runs on every instance, including the ones the product is too large for, so it
+                // is the baseline that is always available. Its budget scales with the tree planner's runtime
+                double memBeforeSampling = getMemoryUsageMB();
+                double startTimeSampling = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+                double samplerBudgetSeconds =
+                    SAMPLER_BUDGET_MULTIPLIER * allocAlg->getMetrics().total_computation_time_ms / 1000.0;
+                if (samplerBudgetSeconds < SAMPLER_MIN_SECONDS) samplerBudgetSeconds = SAMPLER_MIN_SECONDS;
+                RandomSamplingTaskAllocation sampler(buchi, env, mrs, samplerBudgetSeconds);
+                sampler.run();
+                double endTimeSampling = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+                double memUsedSampling = getMemoryUsageMB() - memBeforeSampling;
+
+                allocAlg->getMetrics().setRandomSamplingMetrics(
+                    sampler.getIterations(),
+                    sampler.getOptimalMakespan(),
+                    (endTimeSampling - startTimeSampling) / 1e9,  // convert from nanoseconds to seconds
+                    memUsedSampling
+                );
+
+                // Derived metrics depend on both baselines, so they are computed once both are in
+                allocAlg->getMetrics().computeDerivedMetrics();
+
                 allocAlg->getMetrics().printSummary();
-                
+
+                if (allocAlg->getMetrics().getSolutionQuality().tree_makespan_seconds < 10) {
+                    allocAlg->visualizeOptimalPath("output/optimal_path_" + to_string(automatonId));
+                }
                 // Store run in TestRunManager
                 map<string, string> parameters;
                 parameters["automaton_id"] = to_string(automatonId);
@@ -214,6 +242,8 @@ int main() {
     
     // Export final statistics
     cout << "\n✓ Exporting final statistics..." << endl;
+    // One row per planner per run, for the cross-model comparison plots
+    manager.exportCombinedCSV("data/combined_long.csv");
     manager.exportStatisticsToCSV("data/statistics.csv");
     manager.exportSummaryReport("data/summary_report.txt");
     manager.printTestProgress();
