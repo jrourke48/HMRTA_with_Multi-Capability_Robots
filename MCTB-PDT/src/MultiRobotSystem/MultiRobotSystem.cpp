@@ -212,6 +212,15 @@ void MultiRobotSystem::setRobotPositions(const std::vector<Point>& positions) {
     }
 }
 
+/**
+ * resetRobotPositions - Put every robot back where it was created
+ */
+void MultiRobotSystem::resetRobotPositions() {
+    for (auto* robot : robots) {
+        if (robot) robot->setCurrentPosition(robot->getStartPosition());
+    }
+}
+
 
 /**
  * getEmptyV - Get a vector of false values corresponding to the number of robots

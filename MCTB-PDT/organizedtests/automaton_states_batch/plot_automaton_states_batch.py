@@ -6,6 +6,12 @@ Supports 4 batch configurations: US, CS, ES, and ES+CS
 """
 
 import matplotlib.pyplot as plt
+# Shared thesis styling: Times New Roman, print palette, titles suppressed in favour of captions
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+import thesis_style as _thesis_style
+_thesis_style.apply()
 import os
 import glob
 import csv
@@ -104,17 +110,17 @@ product_makespans_es_cs = [data_es_cs[aid]["product_makespan"] for aid in automa
 # ============================================================================
 if data_us:
     fig1, ax1 = plt.subplots(figsize=(10, 6))
-    fig1.suptitle('Automaton Complexity vs Computation Time (Unrelated Tasks)', fontsize=16, fontweight='bold')
+    fig1.suptitle('Automaton Complexity vs Computation Time (Unrelated Tasks)', fontsize=16)
 
     ax1.plot(states_us, times_us, marker='o', markersize=8, 
-             linewidth=2.5, color='#1f77b4', label='US Configuration')
-    ax1.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
-    ax1.set_ylabel('Computation Time (ms)', fontsize=12, fontweight='bold')
+             linewidth=2.5, color='#0072B2', label='US Configuration')
+    ax1.set_xlabel('Number of Automaton States', fontsize=12)
+    ax1.set_ylabel('Computation Time (ms)', fontsize=12)
     ax1.grid(True, alpha=0.3)
 
     # Add value labels on points
     for i, (s, t) in enumerate(zip(states_us, times_us)):
-        ax1.text(s, t, f'{t:.2f}ms', ha='center', va='bottom', fontweight='bold')
+        ax1.text(s, t, f'{t:.2f}ms', ha='center', va='bottom')
 
     plt.tight_layout()
     plt.savefig('Plots/automaton_computation_time_us.png', dpi=300, bbox_inches='tight')
@@ -126,17 +132,17 @@ if data_us:
 # ============================================================================
 if data_cs:
     fig2, ax2 = plt.subplots(figsize=(10, 6))
-    fig2.suptitle('Automaton Complexity vs Computation Time (Compatible Tasks)', fontsize=16, fontweight='bold')
+    fig2.suptitle('Automaton Complexity vs Computation Time (Compatible Tasks)', fontsize=16)
 
     ax2.plot(states_cs, times_cs, marker='s', markersize=8, 
-             linewidth=2.5, color='#ff7f0e', label='CS Configuration')
-    ax2.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
-    ax2.set_ylabel('Computation Time (ms)', fontsize=12, fontweight='bold')
+             linewidth=2.5, color='#D55E00', label='CS Configuration')
+    ax2.set_xlabel('Number of Automaton States', fontsize=12)
+    ax2.set_ylabel('Computation Time (ms)', fontsize=12)
     ax2.grid(True, alpha=0.3)
 
     # Add value labels on points
     for i, (s, t) in enumerate(zip(states_cs, times_cs)):
-        ax2.text(s, t, f'{t:.2f}ms', ha='center', va='bottom', fontweight='bold')
+        ax2.text(s, t, f'{t:.2f}ms', ha='center', va='bottom')
 
     plt.tight_layout()
     plt.savefig('Plots/automaton_computation_time_cs.png', dpi=300, bbox_inches='tight')
@@ -148,17 +154,17 @@ if data_cs:
 # ============================================================================
 if data_es:
     fig3, ax3 = plt.subplots(figsize=(10, 6))
-    fig3.suptitle('Automaton Complexity vs Computation Time (Exclusive Tasks)', fontsize=16, fontweight='bold')
+    fig3.suptitle('Automaton Complexity vs Computation Time (Exclusive Tasks)', fontsize=16)
 
     ax3.plot(states_es, times_es, marker='^', markersize=8, 
-             linewidth=2.5, color='#2ca02c', label='ES Configuration')
-    ax3.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
-    ax3.set_ylabel('Computation Time (ms)', fontsize=12, fontweight='bold')
+             linewidth=2.5, color='#009E73', label='ES Configuration')
+    ax3.set_xlabel('Number of Automaton States', fontsize=12)
+    ax3.set_ylabel('Computation Time (ms)', fontsize=12)
     ax3.grid(True, alpha=0.3)
 
     # Add value labels on points
     for i, (s, t) in enumerate(zip(states_es, times_es)):
-        ax3.text(s, t, f'{t:.2f}ms', ha='center', va='bottom', fontweight='bold')
+        ax3.text(s, t, f'{t:.2f}ms', ha='center', va='bottom')
 
     plt.tight_layout()
     plt.savefig('Plots/automaton_computation_time_es.png', dpi=300, bbox_inches='tight')
@@ -170,17 +176,17 @@ if data_es:
 # ============================================================================
 if data_es_cs:
     fig4, ax4 = plt.subplots(figsize=(10, 6))
-    fig4.suptitle('Automaton Complexity vs Computation Time (Mixed ES+CS)', fontsize=16, fontweight='bold')
+    fig4.suptitle('Automaton Complexity vs Computation Time (Mixed ES+CS)', fontsize=16)
 
     ax4.plot(states_es_cs, times_es_cs, marker='D', markersize=8, 
-             linewidth=2.5, color='#d62728', label='ES+CS Configuration')
-    ax4.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
-    ax4.set_ylabel('Computation Time (ms)', fontsize=12, fontweight='bold')
+             linewidth=2.5, color='#CC79A7', label='ES+CS Configuration')
+    ax4.set_xlabel('Number of Automaton States', fontsize=12)
+    ax4.set_ylabel('Computation Time (ms)', fontsize=12)
     ax4.grid(True, alpha=0.3)
 
     # Add value labels on points
     for i, (s, t) in enumerate(zip(states_es_cs, times_es_cs)):
-        ax4.text(s, t, f'{t:.2f}ms', ha='center', va='bottom', fontweight='bold')
+        ax4.text(s, t, f'{t:.2f}ms', ha='center', va='bottom')
 
     plt.tight_layout()
     plt.savefig('Plots/automaton_computation_time_es_cs.png', dpi=300, bbox_inches='tight')
@@ -192,17 +198,17 @@ if data_es_cs:
 # ============================================================================
 if data_us and any(makespans_us):
     fig5, ax5 = plt.subplots(figsize=(10, 6))
-    fig5.suptitle('Automaton Complexity vs Makespan (Unrelated Tasks)', fontsize=16, fontweight='bold')
+    fig5.suptitle('Automaton Complexity vs Makespan (Unrelated Tasks)', fontsize=16)
 
     ax5.plot(states_us, makespans_us, marker='o', markersize=8, 
-             linewidth=2.5, color='#1f77b4', label='US Configuration')
-    ax5.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
-    ax5.set_ylabel('Makespan', fontsize=12, fontweight='bold')
+             linewidth=2.5, color='#0072B2', label='US Configuration')
+    ax5.set_xlabel('Number of Automaton States', fontsize=12)
+    ax5.set_ylabel('Makespan', fontsize=12)
     ax5.grid(True, alpha=0.3)
 
     # Add value labels on points
     for i, (s, m) in enumerate(zip(states_us, makespans_us)):
-        ax5.text(s, m, f'{m:.2f}', ha='center', va='bottom', fontweight='bold')
+        ax5.text(s, m, f'{m:.2f}', ha='center', va='bottom')
 
     plt.tight_layout()
     plt.savefig('Plots/automaton_makespan_us.png', dpi=300, bbox_inches='tight')
@@ -214,17 +220,17 @@ if data_us and any(makespans_us):
 # ============================================================================
 if data_cs and any(makespans_cs):
     fig6, ax6 = plt.subplots(figsize=(10, 6))
-    fig6.suptitle('Automaton Complexity vs Makespan (Compatible Tasks)', fontsize=16, fontweight='bold')
+    fig6.suptitle('Automaton Complexity vs Makespan (Compatible Tasks)', fontsize=16)
 
     ax6.plot(states_cs, makespans_cs, marker='s', markersize=8, 
-             linewidth=2.5, color='#ff7f0e', label='CS Configuration')
-    ax6.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
-    ax6.set_ylabel('Makespan', fontsize=12, fontweight='bold')
+             linewidth=2.5, color='#D55E00', label='CS Configuration')
+    ax6.set_xlabel('Number of Automaton States', fontsize=12)
+    ax6.set_ylabel('Makespan', fontsize=12)
     ax6.grid(True, alpha=0.3)
 
     # Add value labels on points
     for i, (s, m) in enumerate(zip(states_cs, makespans_cs)):
-        ax6.text(s, m, f'{m:.2f}', ha='center', va='bottom', fontweight='bold')
+        ax6.text(s, m, f'{m:.2f}', ha='center', va='bottom')
 
     plt.tight_layout()
     plt.savefig('Plots/automaton_makespan_cs.png', dpi=300, bbox_inches='tight')
@@ -236,17 +242,17 @@ if data_cs and any(makespans_cs):
 # ============================================================================
 if data_es and any(makespans_es):
     fig7, ax7 = plt.subplots(figsize=(10, 6))
-    fig7.suptitle('Automaton Complexity vs Makespan (Exclusive Tasks)', fontsize=16, fontweight='bold')
+    fig7.suptitle('Automaton Complexity vs Makespan (Exclusive Tasks)', fontsize=16)
 
     ax7.plot(states_es, makespans_es, marker='^', markersize=8, 
-             linewidth=2.5, color='#2ca02c', label='ES Configuration')
-    ax7.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
-    ax7.set_ylabel('Makespan', fontsize=12, fontweight='bold')
+             linewidth=2.5, color='#009E73', label='ES Configuration')
+    ax7.set_xlabel('Number of Automaton States', fontsize=12)
+    ax7.set_ylabel('Makespan', fontsize=12)
     ax7.grid(True, alpha=0.3)
 
     # Add value labels on points
     for i, (s, m) in enumerate(zip(states_es, makespans_es)):
-        ax7.text(s, m, f'{m:.2f}', ha='center', va='bottom', fontweight='bold')
+        ax7.text(s, m, f'{m:.2f}', ha='center', va='bottom')
 
     plt.tight_layout()
     plt.savefig('Plots/automaton_makespan_es.png', dpi=300, bbox_inches='tight')
@@ -258,17 +264,17 @@ if data_es and any(makespans_es):
 # ============================================================================
 if data_es_cs and any(makespans_es_cs):
     fig8, ax8 = plt.subplots(figsize=(10, 6))
-    fig8.suptitle('Automaton Complexity vs Makespan (Mixed ES+CS)', fontsize=16, fontweight='bold')
+    fig8.suptitle('Automaton Complexity vs Makespan (Mixed ES+CS)', fontsize=16)
 
     ax8.plot(states_es_cs, makespans_es_cs, marker='D', markersize=8, 
-             linewidth=2.5, color='#d62728', label='ES+CS Configuration')
-    ax8.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
-    ax8.set_ylabel('Makespan', fontsize=12, fontweight='bold')
+             linewidth=2.5, color='#CC79A7', label='ES+CS Configuration')
+    ax8.set_xlabel('Number of Automaton States', fontsize=12)
+    ax8.set_ylabel('Makespan', fontsize=12)
     ax8.grid(True, alpha=0.3)
 
     # Add value labels on points
     for i, (s, m) in enumerate(zip(states_es_cs, makespans_es_cs)):
-        ax8.text(s, m, f'{m:.2f}', ha='center', va='bottom', fontweight='bold')
+        ax8.text(s, m, f'{m:.2f}', ha='center', va='bottom')
 
     plt.tight_layout()
     plt.savefig('Plots/automaton_makespan_es_cs.png', dpi=300, bbox_inches='tight')
@@ -279,23 +285,23 @@ if data_es_cs and any(makespans_es_cs):
 # FIGURE 9: Comparison of All Batch Configurations - Computation Time
 # ============================================================================
 fig5, ax5 = plt.subplots(figsize=(12, 7))
-fig5.suptitle('Automaton Complexity vs Computation Time (All Batch Configurations)', fontsize=16, fontweight='bold')
+fig5.suptitle('Automaton Complexity vs Computation Time (All Batch Configurations)', fontsize=16)
 
 if data_us:
     ax5.plot(states_us, times_us, marker='o', markersize=8, 
-             linewidth=2.5, color='#1f77b4', label='US (Unrelated)')
+             linewidth=2.5, color='#0072B2', label='US (Unrelated)')
 if data_cs:
     ax5.plot(states_cs, times_cs, marker='s', markersize=8, 
-             linewidth=2.5, color='#ff7f0e', label='CS (Compatible)')
+             linewidth=2.5, color='#D55E00', label='CS (Compatible)')
 if data_es:
     ax5.plot(states_es, times_es, marker='^', markersize=8, 
-             linewidth=2.5, color='#2ca02c', label='ES (Exclusive)')
+             linewidth=2.5, color='#009E73', label='ES (Exclusive)')
 if data_es_cs:
     ax5.plot(states_es_cs, times_es_cs, marker='D', markersize=8, 
-             linewidth=2.5, color='#d62728', label='ES+CS (Mixed)')
+             linewidth=2.5, color='#CC79A7', label='ES+CS (Mixed)')
 
-ax5.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
-ax5.set_ylabel('Computation Time (ms)', fontsize=12, fontweight='bold')
+ax5.set_xlabel('Number of Automaton States', fontsize=12)
+ax5.set_ylabel('Computation Time (ms)', fontsize=12)
 ax5.legend(fontsize=11, loc='best')
 ax5.grid(True, alpha=0.3)
 
@@ -308,23 +314,23 @@ plt.close(fig5)
 # FIGURE 10: Comparison of All Batch Configurations - Makespan
 # ============================================================================
 fig9, ax9 = plt.subplots(figsize=(12, 7))
-fig9.suptitle('Automaton Complexity vs Makespan (All Batch Configurations)', fontsize=16, fontweight='bold')
+fig9.suptitle('Automaton Complexity vs Makespan (All Batch Configurations)', fontsize=16)
 
 if data_us and any(makespans_us):
     ax9.plot(states_us, makespans_us, marker='o', markersize=8, 
-             linewidth=2.5, color='#1f77b4', label='US (Unrelated)')
+             linewidth=2.5, color='#0072B2', label='US (Unrelated)')
 if data_cs and any(makespans_cs):
     ax9.plot(states_cs, makespans_cs, marker='s', markersize=8, 
-             linewidth=2.5, color='#ff7f0e', label='CS (Compatible)')
+             linewidth=2.5, color='#D55E00', label='CS (Compatible)')
 if data_es and any(makespans_es):
     ax9.plot(states_es, makespans_es, marker='^', markersize=8, 
-             linewidth=2.5, color='#2ca02c', label='ES (Exclusive)')
+             linewidth=2.5, color='#009E73', label='ES (Exclusive)')
 if data_es_cs and any(makespans_es_cs):
     ax9.plot(states_es_cs, makespans_es_cs, marker='D', markersize=8, 
-             linewidth=2.5, color='#d62728', label='ES+CS (Mixed)')
+             linewidth=2.5, color='#CC79A7', label='ES+CS (Mixed)')
 
-ax9.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
-ax9.set_ylabel('Makespan', fontsize=12, fontweight='bold')
+ax9.set_xlabel('Number of Automaton States', fontsize=12)
+ax9.set_ylabel('Makespan', fontsize=12)
 ax9.legend(fontsize=11, loc='best')
 ax9.grid(True, alpha=0.3)
 

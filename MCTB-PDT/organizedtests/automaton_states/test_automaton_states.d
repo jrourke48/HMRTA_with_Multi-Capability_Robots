@@ -32,17 +32,9 @@ organizedtests/automaton_states/test_automaton_states.o: \
  include/../include/LTLFormula/LTLFormula.h \
  include/../include/TestRunManager.h \
  include/../../Automatons/BuchiAutomaton.h \
- include/../../Automatons/ProductAutomaton.h \
- include/../../Automatons/TS.h include/Environment/Environment.h \
- include/../../Automatons/BuchiAutomaton.h \
- include/MultiRobotSystem/MultiRobotSystem.h \
- include/../include/RandomSamplingAlgo/RandomSamplingTaskAllocation.h \
- include/Tree/PlanningDecisionTree.h \
- include/../../Transition_Systems/GeneralTransitionSystem.h \
- include/MultiRobotSystem/RobotCapabilities.h \
- include/../include/RandomSamplingAlgo/RandomNode.h \
- include/../include/RandomSamplingAlgo/../Environment/Point.h \
- include/../include/RandomSamplingAlgo/../../../Automatons/Edge_Node.h
+ organizedtests/automaton_states/../tree_trials.h \
+ organizedtests/automaton_states/../../include/AlgorithmMetrics.h \
+ organizedtests/automaton_states/../../include/TaskAllocationAlgorithms.h
 include/../include/TaskAllocationAlgorithms.h:
 include/../include/AlgorithmMetrics.h:
 include/../include/Tree/PlanningDecisionTree.h:
@@ -78,15 +70,6 @@ include/../include/MultiRobotSystem/MultiRobotSystem.h:
 include/../include/LTLFormula/LTLFormula.h:
 include/../include/TestRunManager.h:
 include/../../Automatons/BuchiAutomaton.h:
-include/../../Automatons/ProductAutomaton.h:
-include/../../Automatons/TS.h:
-include/Environment/Environment.h:
-include/../../Automatons/BuchiAutomaton.h:
-include/MultiRobotSystem/MultiRobotSystem.h:
-include/../include/RandomSamplingAlgo/RandomSamplingTaskAllocation.h:
-include/Tree/PlanningDecisionTree.h:
-include/../../Transition_Systems/GeneralTransitionSystem.h:
-include/MultiRobotSystem/RobotCapabilities.h:
-include/../include/RandomSamplingAlgo/RandomNode.h:
-include/../include/RandomSamplingAlgo/../Environment/Point.h:
-include/../include/RandomSamplingAlgo/../../../Automatons/Edge_Node.h:
+organizedtests/automaton_states/../tree_trials.h:
+organizedtests/automaton_states/../../include/AlgorithmMetrics.h:
+organizedtests/automaton_states/../../include/TaskAllocationAlgorithms.h:

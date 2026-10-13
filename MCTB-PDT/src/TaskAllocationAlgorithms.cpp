@@ -112,6 +112,13 @@ PlanningDecisionTree* TaskAllocationAlgorithms::intensiveInterTaskRelationshipTr
     
     // Initialize metrics: clear to ensure clean state
     metrics->clearMetrics();
+
+    // The robot system is shared across runs and planning moves the robots as it explores, so
+    // without this a run would begin wherever the previous one left the team rather than at the
+    // configured start positions, and every travel time would be measured from the wrong place
+    if (multiRobotSystemPtr) {
+        multiRobotSystemPtr->resetRobotPositions();
+    }
     
     // ===== SET INDEPENDENT VARIABLES =======================================
     //========================================================================
@@ -517,24 +524,26 @@ void TaskAllocationAlgorithms::exclusiveTaskSearch(
     BatchAtomicProposition batchAP = nba->getLTLFormula()->getBatchAP(apId);
     std::vector<bool> requiredCapabilities = batchAP.getCapabilities();
    
-    // Create copy of available robots (exclude robots allocated to opposite batch)
-    std::vector<Robot*> availableRobots = multiRobotSystem->getRobots();
-    
     // Get the opposite batch value for the newnode
     int8_t currentBatch = newNode->getBatch();
     uint16_t oppositeBatch = static_cast<uint16_t>(std::abs(currentBatch));
     std::vector<bool> exclusiveAllocation = planningTree->getAllocationfromBatchValue(oppositeBatch);
-    
-    // Remove allocated robots (loop backward to avoid index shifts)
-    for (int i = static_cast<int>(exclusiveAllocation.size()) - 1; i >= 0; --i) {
-        if (i < static_cast<int>(availableRobots.size()) && exclusiveAllocation[i]) {
-            availableRobots.erase(availableRobots.begin() + i);
-        }
-    }
-    
 
-    
-    auto [taskAllocation, maxTime] = getTaskAllocation(availableRobots, requiredCapabilities, sortedTimes);
+    // Robots committed to the opposite batch are dropped from the candidate order rather than
+    // from the robot list itself. sortedTimes, timesToGoal and the returned allocation are all
+    // indexed over the full team, so erasing from the list would renumber the robots and leave
+    // each one paired with another robot's travel time.
+    std::vector<std::pair<uint16_t, uint16_t>> availableTimes;
+    for (const auto& candidate : sortedTimes) {
+        uint16_t robotIdx = candidate.first;
+        if (robotIdx < exclusiveAllocation.size() && exclusiveAllocation[robotIdx]) {
+            continue;  // already serving the opposite batch
+        }
+        availableTimes.push_back(candidate);
+    }
+
+    const std::vector<Robot*>& allRobots = multiRobotSystem->getRobots();
+    auto [taskAllocation, maxTime] = getTaskAllocation(allRobots, requiredCapabilities, availableTimes);
     
     // Check if we found a valid allocation
     bool hasAllocation = false;

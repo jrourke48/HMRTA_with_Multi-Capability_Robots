@@ -23,6 +23,12 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib import cm
+# Shared thesis styling: Times New Roman, print palette, titles suppressed in favour of captions
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+import thesis_style as _thesis_style
+_thesis_style.apply()
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -32,9 +38,9 @@ TESTS = {
                       lambda row, fname: int(row['num_robots'])),
     'automaton_states': ('automaton_states_num_robots_*.csv', 'Number of Robots',
                          lambda row, fname: int(row['num_robots'])),
-    'average_capabilities': ('automaton_states_automaton_id_*.csv', 'Number of Robots',
+    'average_capabilities': (('avg_capabilities_automaton_id_*.csv', 'automaton_states_automaton_id_*.csv'), 'Number of Robots',
                              lambda row, fname: int(row['num_robots'])),
-    'robot_homogeneity': ('automaton_states_automaton_id_*.csv', 'Number of Robots',
+    'robot_homogeneity': (('robot_homogeneity_automaton_id_*.csv', 'automaton_states_automaton_id_*.csv'), 'Number of Robots',
                           lambda row, fname: int(row['num_robots'])),
     # Robot count is fixed at 6 in this test
     'transition_system_regions': ('ts_regions_automaton_id_*.csv', 'Number of TS Regions',
@@ -59,22 +65,33 @@ def count_atomic_propositions(test_dir):
     return ap_counts
 
 
-def load_rows(test_dir, csv_pattern, x_of):
-    """Return a list of (x, capability ratio, automaton id, makespan) for every run"""
-    rows = []
-    for csv_file in sorted(glob.glob(os.path.join(test_dir, 'data', csv_pattern))):
+def load_rows(test_dir, csv_patterns, x_of, test_name):
+    """Return tree and sampler point lists, one entry per instance row."""
+    patterns = (csv_patterns,) if isinstance(csv_patterns, str) else csv_patterns
+    csv_files = sorted({path for pattern in patterns
+                        for path in glob.glob(os.path.join(test_dir, 'data', pattern))})
+    tree_rows = []
+    sampler_rows = []
+    for csv_file in csv_files:
         with open(csv_file, 'r') as f:
-            for row in csv.DictReader(f):
-                makespan = row.get('tree_makespan_seconds', '').strip()
-                robot_caps = float(row.get('total_robot_capabilities', 0) or 0)
-                if not makespan or robot_caps == 0:
-                    continue
-                ratio = float(row['total_required_capabilities']) / robot_caps
-                rows.append((x_of(row, os.path.basename(csv_file)), ratio, int(row['automaton_id']), float(makespan)))
-    return rows
+            rows = list(csv.DictReader(f))
+        for row in rows:
+            robot_caps = float(row.get('total_robot_capabilities', 0) or 0)
+            if robot_caps == 0:
+                continue
+            x = x_of(row, os.path.basename(csv_file))
+            ratio = float(row['total_required_capabilities']) / robot_caps
+            automaton_id = int(row['automaton_id'])
+            tree_makespan = row.get('tree_makespan_seconds', '').strip()
+            sampler_makespan = row.get('random_sampling_makespan_seconds', '').strip()
+            if tree_makespan:
+                tree_rows.append((x, ratio, automaton_id, float(tree_makespan)))
+            if test_name != 'automaton_states_batch' and sampler_makespan:
+                sampler_rows.append((x, ratio, automaton_id, float(sampler_makespan)))
+    return tree_rows, sampler_rows
 
 
-def plot_3d(points, x_label, y_label, title, out_path):
+def plot_3d(points, x_label, y_label, z_label, title, out_path):
     """points: list of (x, y, makespan). Surface through the mean makespan at each (x, y), dots for every run."""
     means = defaultdict(list)
     for x, y, z in points:
@@ -104,10 +121,10 @@ def plot_3d(points, x_label, y_label, title, out_path):
     dots = ax.scatter(xs, ys, zs, c=zs, cmap=cm.Blues, vmin=0, vmax=vmax,
                       edgecolor='#0b0b0b', linewidth=0.5, s=18, depthshade=False)
 
-    ax.set_title(title, fontsize=15, fontweight='bold')
-    ax.set_xlabel(x_label, fontsize=12, fontweight='bold', labelpad=10)
-    ax.set_ylabel(y_label, fontsize=12, fontweight='bold', labelpad=10)
-    ax.set_zlabel('Task Allocation Makespan (s)', fontsize=12, fontweight='bold', labelpad=12)
+    ax.set_title(title, fontsize=15)
+    ax.set_xlabel(x_label, fontsize=12, labelpad=10)
+    ax.set_ylabel(y_label, fontsize=12, labelpad=10)
+    ax.set_zlabel(z_label, fontsize=12, labelpad=12)
     # Tick at every data value, skipping values too close to the previous tick to read
     def data_ticks(values):
         values = sorted(set(values))
@@ -139,7 +156,7 @@ def plot_3d(points, x_label, y_label, title, out_path):
 def plot_test(test_name):
     csv_pattern, x_label, x_of = TESTS[test_name]
     test_dir = os.path.join(BASE_DIR, test_name)
-    rows = load_rows(test_dir, csv_pattern, x_of)
+    rows, sampler_rows = load_rows(test_dir, csv_pattern, x_of, test_name)
     if not rows:
         print(f"Skipping {test_name}: no CSV data found")
         return
@@ -150,8 +167,16 @@ def plot_test(test_name):
 
     plot_3d([(x, ratio, z) for x, ratio, _, z in rows],
             x_label, 'Required / Robot Capabilities',
+            'Task Allocation Makespan (s)',
             f'{pretty}: {x_label} vs Capability Ratio vs Makespan',
             os.path.join(plots_dir, f'{test_name}_capability_ratio_makespan_3d.png'))
+
+    if sampler_rows:
+        plot_3d([(x, ratio, z) for x, ratio, _, z in sampler_rows],
+                x_label, 'Required / Robot Capabilities',
+                'Random Sampling Makespan (s)',
+                f'{pretty}: {x_label} vs Capability Ratio vs Sampler Makespan',
+                os.path.join(plots_dir, f'{test_name}_capability_ratio_sampler_makespan_3d.png'))
 
     missing = sorted({a for _, _, a, _ in rows if a not in ap_counts})
     if missing:
@@ -159,8 +184,16 @@ def plot_test(test_name):
     ap_points = [(x, ap_counts[a], z) for x, _, a, z in rows if a in ap_counts]
     if ap_points:
         plot_3d(ap_points, x_label, 'Number of Atomic Propositions',
+                'Task Allocation Makespan (s)',
                 f'{pretty}: {x_label} vs Atomic Propositions vs Makespan',
                 os.path.join(plots_dir, f'{test_name}_atomic_propositions_makespan_3d.png'))
+
+    sampler_ap_points = [(x, ap_counts[a], z) for x, _, a, z in sampler_rows if a in ap_counts]
+    if sampler_ap_points:
+        plot_3d(sampler_ap_points, x_label, 'Number of Atomic Propositions',
+                'Random Sampling Makespan (s)',
+                f'{pretty}: {x_label} vs Atomic Propositions vs Sampler Makespan',
+                os.path.join(plots_dir, f'{test_name}_atomic_propositions_sampler_makespan_3d.png'))
 
 
 if __name__ == '__main__':

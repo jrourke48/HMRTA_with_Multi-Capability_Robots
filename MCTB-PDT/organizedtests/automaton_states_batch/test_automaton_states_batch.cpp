@@ -14,6 +14,7 @@
 #include "../include/LTLFormula/LTLFormula.h"
 #include "../include/TestRunManager.h"
 #include "../../Automatons/BuchiAutomaton.h"
+#include "../tree_trials.h"
 #include "../../Automatons/ProductAutomaton.h"
 
 using namespace std;
@@ -152,19 +153,19 @@ int main() {
                     continue;
                 }
                 
-                // Create TaskAllocationAlgorithms
-                TaskAllocationAlgorithms* allocAlg = new TaskAllocationAlgorithms(buchi, env, mrs);
-                
+                // Tree planner, repeated and averaged. This sweep never ran the product or the
+                // sampler, so only the repeats are new; the drawing below still comes from the
+                // last pass, which is the tree the metrics describe.
                 double memBefore = getMemoryUsageMB();
-                //build the planning decision tree
-                allocAlg->intensiveInterTaskRelationshipTreeSearch(buchi, env, mrs);
-                double memAfter = getMemoryUsageMB();
-                double memUsed = memAfter - memBefore;
+                vector<double> treeTimes;
+                TaskAllocationAlgorithms* allocAlg =
+                    treetrials::runRepeated(buchi, env, mrs, treeTimes);
                 //visualize the optimal path for certain configurations and automata
                 if (static_cast<int>(config) > 1 && automatonId >= 12) {
                     allocAlg->visualizeOptimalPath("output/automaton_test_" + to_string(static_cast<int>(config)) + "intertaskconstraints_" + to_string(automatonId) + "_path");
                 }
-                allocAlg->getMetrics().setTaskMemoryUsageMB(memUsed); 
+                allocAlg->getMetrics().setTaskMemoryUsageMB(getMemoryUsageMB() - memBefore);
+                treetrials::recordTiming(allocAlg->getMetrics(), treeTimes);
                 cout << "✓ Complete\n";
                 allocAlg->getMetrics().printSummary();
                 

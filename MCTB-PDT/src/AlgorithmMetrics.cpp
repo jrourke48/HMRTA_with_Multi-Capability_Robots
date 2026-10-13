@@ -50,6 +50,14 @@ void AlgorithmMetrics::clearMetrics() {
     // Clear solution quality metrics
     solution_quality_.tree_makespan_seconds = 0.0;
     solution_quality_.product_makespan_seconds = 0.0;
+    solution_quality_.random_sampling_makespan_seconds = 0.0;
+    subtree_efficiency_.random_sampling_iterations = 0;
+    subtree_efficiency_.random_sampling_memory_MB = 0.0;
+    subtree_efficiency_.random_sampling_budget_multiplier = 0.0;
+    subtree_efficiency_.tree_computation_time_stddev_ms = 0.0;
+    subtree_efficiency_.random_sampling_computation_time_stddev = 0.0;
+    solution_quality_.random_sampling_makespan_stddev = 0.0;
+    random_sampling_computation_time_seconds = 0.0;
     solution_quality_.sum_of_travel_times_seconds = 0.0;
     solution_quality_.total_travel_distance = 0.0;
     solution_quality_.max_individual_travel_distance = 0.0;
@@ -167,17 +175,32 @@ double AlgorithmMetrics::computeMemoryReductionRatio() const {
 }
 double AlgorithmMetrics::computeOptimalityGap() const {
     if (solution_quality_.tree_makespan_seconds == 0) return 0.0;
-    // Return NaN if no path was found (sentinel: product makespan is max uint32)
-    if (solution_quality_.product_makespan_seconds == std::numeric_limits<uint32_t>::max()) {
+
+    // Measure against the product automaton when one was built. On instances too large for it the
+    // random sampler is the only other baseline, so fall back to that rather than report nothing
+    const double baseline = (subtree_efficiency_.full_product_automaton_nodes > 0 && solution_quality_.product_makespan_seconds < std::numeric_limits<uint32_t>::max() / 2)
+        ? solution_quality_.product_makespan_seconds
+        : solution_quality_.random_sampling_makespan_seconds;
+
+    // Neither baseline ran, so there is nothing to compare against
+    if (baseline == 0) return 0.0;
+    // Return NaN if no path was found (sentinel: baseline makespan is max uint32)
+    if (baseline == std::numeric_limits<uint32_t>::max()) {
         return std::numeric_limits<double>::quiet_NaN();
     }
-    return 100.0 * static_cast<double>(solution_quality_.tree_makespan_seconds-solution_quality_.product_makespan_seconds) /
-           solution_quality_.tree_makespan_seconds;
+    return 100.0 * (solution_quality_.tree_makespan_seconds - baseline) /
+           baseline;
 }
 double AlgorithmMetrics::computeRuntimeSpeedup() const {
     if (total_computation_time_ms == 0) return 0.0;
-    return (product_computation_time_ms) / 
-           total_computation_time_ms;
+
+    // Measure against the product automaton when it ran, otherwise against the random sampler.
+    // The sampler records seconds while the tree and the product record milliseconds
+    const double baseline_ms = (product_computation_time_ms > 0)
+        ? product_computation_time_ms
+        : random_sampling_computation_time_seconds * 1000.0;
+
+    return baseline_ms / total_computation_time_ms;
 }
 
 double AlgorithmMetrics::computeRobotUtilizationRatio() const {
@@ -256,6 +279,23 @@ void AlgorithmMetrics::printSummary() const {
               << solution_quality_.product_makespan_seconds << " s" << std::endl;
     std::cout << "  Full Product Memory Usage: " << std::fixed << std::setprecision(2) 
               << subtree_efficiency_.full_product_automaton_memory_MB << " MB" << "\n" << std::endl;
+
+    // Random Sampling Metrics
+    std::cout << "RANDOM SAMPLING METRICS:" << std::endl;
+    std::cout << "  Random Sampling Iterations: " << subtree_efficiency_.random_sampling_iterations << std::endl;
+    std::cout << "  Random Sampling Computation Time: " << std::fixed << std::setprecision(4)
+              << random_sampling_computation_time_seconds << " s" << std::endl;
+    std::cout << "  Random Sampling Makespan: " << std::fixed << std::setprecision(2)
+              << solution_quality_.random_sampling_makespan_seconds << " s" << std::endl;
+    std::cout << "  Random Sampling Memory Usage: " << std::fixed << std::setprecision(2)
+              << subtree_efficiency_.random_sampling_memory_MB << " MB" << std::endl;
+    std::cout << "  Random Sampling Budget Multiple: " << std::fixed << std::setprecision(0)
+              << subtree_efficiency_.random_sampling_budget_multiplier << "x tree time" << std::endl;
+    std::cout << "  Spread over trials (stddev): tree time "
+              << std::fixed << std::setprecision(4) << subtree_efficiency_.tree_computation_time_stddev_ms << " ms, "
+              << "sampler time " << subtree_efficiency_.random_sampling_computation_time_stddev << " s, "
+              << "sampler makespan " << std::setprecision(2)
+              << solution_quality_.random_sampling_makespan_stddev << " s" << "\n" << std::endl;
     
     // Subtree Efficiency
     std::cout << "SUBTREE EFFICIENCY METRICS:" << std::endl;
@@ -328,6 +368,23 @@ void AlgorithmMetrics::exportToCSV(const std::string& filename) const {
             << solution_quality_.product_makespan_seconds << ",seconds\n";
     outfile << "Full Product Memory Usage," << std::fixed << std::setprecision(2) 
             << subtree_efficiency_.full_product_automaton_memory_MB << ",MB\n";
+
+    // Random Sampling Metrics
+    outfile << "Random Sampling Iterations," << subtree_efficiency_.random_sampling_iterations << ",count\n";
+    outfile << "Random Sampling Computation Time," << std::fixed << std::setprecision(4)
+            << random_sampling_computation_time_seconds << ",seconds\n";
+    outfile << "Random Sampling Makespan," << std::fixed << std::setprecision(2)
+            << solution_quality_.random_sampling_makespan_seconds << ",seconds\n";
+    outfile << "Random Sampling Memory Usage," << std::fixed << std::setprecision(2)
+            << subtree_efficiency_.random_sampling_memory_MB << ",MB\n";
+    outfile << "Random Sampling Budget Multiple," << std::fixed << std::setprecision(0)
+            << subtree_efficiency_.random_sampling_budget_multiplier << ",x tree time\n";
+    outfile << "Tree Computation Time StdDev," << std::fixed << std::setprecision(4)
+            << subtree_efficiency_.tree_computation_time_stddev_ms << ",ms\n";
+    outfile << "Random Sampling Computation Time StdDev," << std::setprecision(4)
+            << subtree_efficiency_.random_sampling_computation_time_stddev << ",seconds\n";
+    outfile << "Random Sampling Makespan StdDev," << std::setprecision(2)
+            << solution_quality_.random_sampling_makespan_stddev << ",seconds\n";
     
     // Subtree Efficiency
     outfile << "Total Nodes Pruned," << subtree_efficiency_.total_nodes_pruned << ",count\n";
@@ -385,7 +442,25 @@ void AlgorithmMetrics::exportToJSON(const std::string& filename) const {
     outfile << "    \"full_product_memory_MB\": " << std::fixed << std::setprecision(2) 
             << subtree_efficiency_.full_product_automaton_memory_MB << "\n";
     outfile << "  },\n";
-    
+
+    outfile << "  \"random_sampling_metrics\": {\n";
+    outfile << "    \"random_sampling_iterations\": " << subtree_efficiency_.random_sampling_iterations << ",\n";
+    outfile << "    \"random_sampling_computation_time_seconds\": " << std::fixed << std::setprecision(4)
+            << random_sampling_computation_time_seconds << ",\n";
+    outfile << "    \"random_sampling_makespan_seconds\": " << std::fixed << std::setprecision(2)
+            << solution_quality_.random_sampling_makespan_seconds << ",\n";
+    outfile << "    \"random_sampling_memory_MB\": " << std::fixed << std::setprecision(2)
+            << subtree_efficiency_.random_sampling_memory_MB << ",\n";
+    outfile << "    \"random_sampling_budget_multiplier\": " << std::fixed << std::setprecision(0)
+            << subtree_efficiency_.random_sampling_budget_multiplier << ",\n";
+    outfile << "    \"tree_computation_time_stddev_ms\": " << std::setprecision(4)
+            << subtree_efficiency_.tree_computation_time_stddev_ms << ",\n";
+    outfile << "    \"random_sampling_computation_time_stddev\": " << std::setprecision(4)
+            << subtree_efficiency_.random_sampling_computation_time_stddev << ",\n";
+    outfile << "    \"random_sampling_makespan_stddev\": " << std::setprecision(2)
+            << solution_quality_.random_sampling_makespan_stddev << "\n";
+    outfile << "  },\n";
+
     outfile << "  \"subtree_efficiency_metrics\": {\n";
     outfile << "    \"total_nodes_traversed\": " << subtree_efficiency_.total_nodes_traversed << ",\n";
     outfile << "    \"total_nodes_pruned\": " << subtree_efficiency_.total_nodes_pruned << ",\n";
@@ -424,4 +499,128 @@ void AlgorithmMetrics::setFullProductAutomatonMetrics(long long nodes, long long
     subtree_efficiency_.full_product_automaton_memory_MB = MB;
     product_computation_time_ms = computation_time_ms;
     solution_quality_.product_makespan_seconds = makespan_seconds;
+}
+
+
+void AlgorithmMetrics::setRandomSamplingMetrics(uint32_t iterations, double makespan_seconds,
+                                               double computation_time_seconds, double MB) {
+    subtree_efficiency_.random_sampling_iterations = iterations;
+    subtree_efficiency_.random_sampling_memory_MB = MB;
+    random_sampling_computation_time_seconds = computation_time_seconds;
+    solution_quality_.random_sampling_makespan_seconds = makespan_seconds;
+}
+
+/**
+ * @brief Average a set of trials field by field.
+ * @param trials Metrics from repeated runs of one configuration.
+ * @return The averaged metrics, with derived fields recomputed rather than averaged.
+ *
+ * Every primitive field is averaged, including ones that never vary. That is deliberate: the mean
+ * of identical values is that value, so deterministic fields pass through untouched and there is
+ * no hand-written list of "fields that vary" to fall out of date when a metric is added.
+ */
+AlgorithmMetrics AlgorithmMetrics::mean(const std::vector<AlgorithmMetrics>& trials) {
+    if (trials.empty()) return AlgorithmMetrics();
+    if (trials.size() == 1) return trials.front();
+
+    AlgorithmMetrics out = trials.front();
+    const double n = static_cast<double>(trials.size());
+
+    auto avgD = [&](double AlgorithmMetrics::*field) {
+        double sum = 0.0;
+        for (const auto& t : trials) sum += t.*field;
+        out.*field = sum / n;
+    };
+
+    // Timings live directly on the object
+    avgD(&AlgorithmMetrics::total_computation_time_ms);
+    avgD(&AlgorithmMetrics::product_computation_time_ms);
+    avgD(&AlgorithmMetrics::random_sampling_computation_time_seconds);
+
+    auto avgIv = [&](double IndependentVariables::*field) {
+        double sum = 0.0;
+        for (const auto& t : trials) sum += t.iv_.*field;
+        out.iv_.*field = sum / n;
+    };
+    auto avgIvInt = [&](int IndependentVariables::*field) {
+        double sum = 0.0;
+        for (const auto& t : trials) sum += t.iv_.*field;
+        out.iv_.*field = static_cast<int>(std::llround(sum / n));
+    };
+    avgIvInt(&IndependentVariables::num_automaton_states);
+    avgIvInt(&IndependentVariables::num_automaton_edges);
+    avgIvInt(&IndependentVariables::total_required_capabilities);
+    avgIvInt(&IndependentVariables::independent_required_capabilities);
+    avgIvInt(&IndependentVariables::num_atomic_propositions);
+    avgIvInt(&IndependentVariables::num_robots);
+    avgIvInt(&IndependentVariables::total_robot_capabilities);
+    avgIvInt(&IndependentVariables::independent_robot_capabilities);
+    avgIvInt(&IndependentVariables::num_ts_regions);
+    avgIvInt(&IndependentVariables::num_inter_task_constraints);
+    avgIv(&IndependentVariables::avg_capabilities_per_robot);
+    avgIv(&IndependentVariables::capability_homogeneity);
+
+    auto avgEffLL = [&](long long SubtreeEfficiencyMetrics::*field) {
+        double sum = 0.0;
+        for (const auto& t : trials) sum += static_cast<double>(t.subtree_efficiency_.*field);
+        out.subtree_efficiency_.*field = std::llround(sum / n);
+    };
+    auto avgEffD = [&](double SubtreeEfficiencyMetrics::*field) {
+        double sum = 0.0;
+        for (const auto& t : trials) sum += t.subtree_efficiency_.*field;
+        out.subtree_efficiency_.*field = sum / n;
+    };
+    avgEffLL(&SubtreeEfficiencyMetrics::total_nodes_planning);
+    avgEffLL(&SubtreeEfficiencyMetrics::total_nodes_traversed);
+    avgEffLL(&SubtreeEfficiencyMetrics::total_nodes_pruned);
+    avgEffLL(&SubtreeEfficiencyMetrics::nodes_satisfying_ltl);
+    avgEffLL(&SubtreeEfficiencyMetrics::full_product_automaton_nodes);
+    avgEffLL(&SubtreeEfficiencyMetrics::full_product_automaton_edges);
+    avgEffD(&SubtreeEfficiencyMetrics::task_allocation_algorithm_memory_MB);
+    avgEffD(&SubtreeEfficiencyMetrics::full_product_automaton_memory_MB);
+    avgEffD(&SubtreeEfficiencyMetrics::random_sampling_memory_MB);
+    {
+        double sum = 0.0;
+        for (const auto& t : trials) sum += static_cast<double>(t.subtree_efficiency_.random_sampling_iterations);
+        out.subtree_efficiency_.random_sampling_iterations = static_cast<uint32_t>(std::llround(sum / n));
+    }
+
+    auto avgQualD = [&](double SolutionQualityMetrics::*field) {
+        double sum = 0.0;
+        for (const auto& t : trials) sum += t.solution_quality_.*field;
+        out.solution_quality_.*field = sum / n;
+    };
+    avgQualD(&SolutionQualityMetrics::tree_makespan_seconds);
+    avgQualD(&SolutionQualityMetrics::product_makespan_seconds);
+    avgQualD(&SolutionQualityMetrics::random_sampling_makespan_seconds);
+    avgQualD(&SolutionQualityMetrics::sum_of_travel_times_seconds);
+    avgQualD(&SolutionQualityMetrics::total_travel_distance);
+    avgQualD(&SolutionQualityMetrics::max_individual_travel_distance);
+    avgQualD(&SolutionQualityMetrics::load_balance_variance);
+    avgQualD(&SolutionQualityMetrics::robot_utilization_ratio);
+    {
+        double sum = 0.0;
+        for (const auto& t : trials) sum += t.solution_quality_.robots_utilized;
+        out.solution_quality_.robots_utilized = static_cast<int>(std::llround(sum / n));
+    }
+
+    // Ratios and gaps are functions of the fields above, so they are recomputed from the averaged
+    // values rather than averaged themselves
+    out.computeDerivedMetrics();
+    return out;
+}
+
+/**
+ * @brief Population standard deviation of one sampled quantity across trials.
+ * @param values One value per trial.
+ * @return 0 when fewer than two values were supplied.
+ */
+double AlgorithmMetrics::stddev(const std::vector<double>& values) {
+    if (values.size() < 2) return 0.0;
+    double sum = 0.0;
+    for (double v : values) sum += v;
+    const double mean_value = sum / static_cast<double>(values.size());
+    double variance = 0.0;
+    for (double v : values) variance += (v - mean_value) * (v - mean_value);
+    return std::sqrt(variance / static_cast<double>(values.size()));
 }

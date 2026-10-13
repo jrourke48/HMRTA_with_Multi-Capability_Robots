@@ -16,12 +16,16 @@ Tree_Node::Tree_Node(uint32_t id, Tree_Node* parent, Node* automatonState, Node*
  * Tree_Node - Constructor (simplified)
  * Initializes a tree node with only a parent, automaton, transition system states, and batch
  * Other fields are initialized with default values
- * Times are inherited from parent if parent exists, otherwise initialized as empty
+ * Times and robot positions are inherited from the parent if one exists, otherwise empty.
+ * Positions must be inherited alongside times: a search that returns before assigning them
+ * would otherwise leave the node with none, and every node below it would inherit the gap and
+ * measure travel from whatever robot coordinates were last written to the shared robot system.
  */
 Tree_Node::Tree_Node(uint32_t id, Tree_Node* parent, Node* automatonState, Node* tsState, int8_t batch)
     : id(id), ParentNode(parent), automaton_state(automatonState), ts_state(tsState),
       robo_task_allocation(), times(parent ? parent->getTimes() : std::vector<uint16_t>()), 
-      robotPositions(), batch(batch), prog(TASK_PROGRESS::PRE) {
+      robotPositions(parent ? parent->getRobotPositions() : std::vector<Point>()),
+      batch(batch), prog(TASK_PROGRESS::PRE) {
 }
 
 /**

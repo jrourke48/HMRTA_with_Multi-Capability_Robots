@@ -15,8 +15,7 @@
 #include "../include/LTLFormula/LTLFormula.h"
 #include "../include/TestRunManager.h"
 #include "../../Automatons/BuchiAutomaton.h"
-#include "../../Automatons/ProductAutomaton.h"
-#include "../include/RandomSamplingAlgo/RandomSamplingTaskAllocation.h"
+#include "../tree_trials.h"
 
 using namespace std;
 //=================================================================================
@@ -28,9 +27,10 @@ using namespace std;
 // The sampler is given a multiple of the tree planner's own runtime on the same instance, so the
 // two are compared at a proportional compute budget rather than an arbitrary fixed one
 static const double SAMPLER_BUDGET_MULTIPLIER = 100.0;
-// A tree search too fast to measure would leave the budget at zero, which the sampler reads as
-// "no limit" and would never stop on
-static const double SAMPLER_MIN_SECONDS = 0.01;
+// The sampler is no longer run here. It is an anytime method, so quoting it against a single
+// budget said less than the budget study does, where it runs at 5/20/40/70/100x the tree
+// planner's measured runtime. merge_external_data.py joins its 100x rows back into these CSVs,
+// which is the budget this sweep used to apply, so the plots read the same column as before.
 
 // Forward declarations
 void createTestEnvironment3(TS*& ts, GridWorld*& grid, Environment*& env, MultiRobotSystem*& mrs);
@@ -61,6 +61,7 @@ double getMemoryUsageMB() {
     getrusage(RUSAGE_SELF, &r_usage);
     return (double)r_usage.ru_maxrss / 1024.0;  // Convert from KB to MB
 }
+
 
 int main() {
     cout << string(80, '=') << endl;
@@ -139,57 +140,15 @@ int main() {
                     continue;
                 }
                 
-                // Create TaskAllocationAlgorithms
-                TaskAllocationAlgorithms* allocAlg = new TaskAllocationAlgorithms(buchi, env, mrs);
-                
-                // Measure memory 
+                // Tree planner only, repeated and averaged. The product automaton is archived in
+                // comparison/product_archive.csv rather than rebuilt, and the sampler lives in
+                // the budget study; merge_external_data.py puts both back into these CSVs.
                 double memBefore = getMemoryUsageMB();
-                //build the planning decision tree
-                allocAlg->intensiveInterTaskRelationshipTreeSearch(buchi, env, mrs);
-                double memAfter = getMemoryUsageMB();
-                double memUsed = memAfter - memBefore;
-                allocAlg->getMetrics().setTaskMemoryUsageMB(memUsed);
-                bool shouldSkip = (robotCount > 5) && (buchi->getNumStates()*std::pow(ts->getNumStates(), robotCount) > UINT16_MAX/2);
-                if (!shouldSkip) {
-                    //buld the product automaton and store its metrics
-                    double memBeforeProduct = getMemoryUsageMB();
-                    double startTimeProduct = std::chrono::high_resolution_clock::now().time_since_epoch().count();
-                    ProductAutomaton productAutomaton(*env, *mrs, *buchi);
-                    std::tuple<std::vector<uint16_t>, uint32_t> optimalPath = productAutomaton.OptimalAcceptingPath();
-                    double memAfterProduct = getMemoryUsageMB();
-                    double endTimeProduct = std::chrono::high_resolution_clock::now().time_since_epoch().count();
-                    double memUsedProduct = memAfterProduct - memBeforeProduct;
-                    
-                    //add the full product automaton metrics to the algorithm metrics
-                    allocAlg->getMetrics().setFullProductAutomatonMetrics(
-                        productAutomaton.getNumStates(),
-                        productAutomaton.getNumEdges(),
-                        std::get<1>(optimalPath), // makespan for product
-                        (endTimeProduct - startTimeProduct) / 1e6,  // convert from nanoseconds to milliseconds
-                        memUsedProduct
-                    );
-                }
-
-                // The sampler runs on every instance, including the ones the product is too large for, so it
-                // is the baseline that is always available. Its budget scales with the tree planner's runtime
-                double memBeforeSampling = getMemoryUsageMB();
-                double startTimeSampling = std::chrono::high_resolution_clock::now().time_since_epoch().count();
-                double samplerBudgetSeconds =
-                    SAMPLER_BUDGET_MULTIPLIER * allocAlg->getMetrics().total_computation_time_ms / 1000.0;
-                if (samplerBudgetSeconds < SAMPLER_MIN_SECONDS) samplerBudgetSeconds = SAMPLER_MIN_SECONDS;
-                RandomSamplingTaskAllocation sampler(buchi, env, mrs, samplerBudgetSeconds);
-                sampler.run();
-                double endTimeSampling = std::chrono::high_resolution_clock::now().time_since_epoch().count();
-                double memUsedSampling = getMemoryUsageMB() - memBeforeSampling;
-
-                allocAlg->getMetrics().setRandomSamplingMetrics(
-                    sampler.getIterations(),
-                    sampler.getOptimalMakespan(),
-                    (endTimeSampling - startTimeSampling) / 1e9,  // convert from nanoseconds to seconds
-                    memUsedSampling
-                );
-
-                // Derived metrics depend on both baselines, so they are computed once both are in
+                vector<double> treeTimes;
+                TaskAllocationAlgorithms* allocAlg =
+                    treetrials::runRepeated(buchi, env, mrs, treeTimes);
+                allocAlg->getMetrics().setTaskMemoryUsageMB(getMemoryUsageMB() - memBefore);
+                treetrials::recordTiming(allocAlg->getMetrics(), treeTimes);
                 allocAlg->getMetrics().computeDerivedMetrics();
 
                 allocAlg->getMetrics().printSummary();

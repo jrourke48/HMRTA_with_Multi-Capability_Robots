@@ -75,8 +75,8 @@ void TestRunManager::storeRun(const AlgorithmMetrics& metrics,
     // Store in memory
     runs_.push_back(run);
     
-    // Persist to file
-    saveCategoryData();
+    // Not persisted per run: the CSV exports carry every metric, and a file per run produced
+    // hundreds of them per sweep. Call saveCategoryData() directly if a dump is ever wanted.
     
     std::cout << "✓ Stored run " << run.run_id << " in category \"" 
               << getCategoryName() << "\" (trial " << trial_number << ")"
@@ -216,7 +216,13 @@ void TestRunManager::exportByConfiguration(const std::string& output_dir, const 
             << "nodes_satisfying_ltl,pruning_ratio,full_product_automaton_nodes,"
             << "full_product_automaton_edges,explored_product_ratio,task_allocation_algorithm_memory_MB,"
             << "full_product_automaton_memory_MB,total_computation_time_ms,product_computation_time_ms,"
-            << "tree_makespan_seconds,product_makespan_seconds,robots_utilized,"
+            << "tree_makespan_seconds,product_makespan_seconds,"
+            << "random_sampling_iterations,random_sampling_computation_time_seconds,"
+            << "random_sampling_makespan_seconds,random_sampling_memory_MB,"
+            << "random_sampling_budget_multiplier,tree_computation_time_stddev_ms,"
+            << "random_sampling_computation_time_stddev,random_sampling_makespan_stddev,"
+            << "tree_product_ratio,memory_reduction_ratio,optimality_gap_percent,"
+            << "runtime_speedup,percent_nodes_in_tree,state_space_reduction,robots_utilized,"
             << "robot_utilization_ratio,load_balance_variance\n";
         
         // Write data for this configuration
@@ -260,6 +266,20 @@ void TestRunManager::exportByConfiguration(const std::string& output_dir, const 
                 << "," << metrics.product_computation_time_ms
                 << "," << quality.tree_makespan_seconds
                 << "," << quality.product_makespan_seconds
+                << "," << efficiency.random_sampling_iterations
+                << "," << metrics.random_sampling_computation_time_seconds
+                << "," << quality.random_sampling_makespan_seconds
+                << "," << efficiency.random_sampling_memory_MB
+                << "," << efficiency.random_sampling_budget_multiplier
+                << "," << efficiency.tree_computation_time_stddev_ms
+                << "," << efficiency.random_sampling_computation_time_stddev
+                << "," << quality.random_sampling_makespan_stddev
+                << "," << efficiency.tree_product_ratio
+                << "," << efficiency.memory_reduction_ratio
+                << "," << efficiency.optimality_gap_percent
+                << "," << efficiency.runtime_speedup
+                << "," << efficiency.percent_nodes_in_tree
+                << "," << efficiency.state_space_reduction
                 << "," << quality.robots_utilized
                 << "," << quality.robot_utilization_ratio
                 << "," << quality.load_balance_variance
@@ -269,6 +289,101 @@ void TestRunManager::exportByConfiguration(const std::string& output_dir, const 
         out.close();
         std::cout << "✓ Exported " << config_runs.size() << " runs to: " << filename.str() << std::endl;
     }
+}
+
+// One row per (run, method) rather than one per run, so the three planners can be compared
+// directly. The makespan ratio is taken against the best result any method achieved on that
+// same instance, which is the product when it was built and the better of the other two
+// otherwise, so instances of different sizes stay comparable.
+void TestRunManager::exportCombinedCSV(const std::string& output_filename) const {
+    if (runs_.empty()) {
+        std::cerr << "No runs to export for category: " << getCategoryName() << std::endl;
+        return;
+    }
+
+    fs::path out_path(output_filename);
+    if (out_path.has_parent_path()) {
+        fs::create_directories(out_path.parent_path());
+    }
+
+    std::ofstream out(output_filename);
+    if (!out) {
+        std::cerr << "Could not write combined CSV: " << output_filename << std::endl;
+        return;
+    }
+
+    out << "sweep,run_id,trial_number,independent_variable,independent_value,"
+        << "num_robots,num_automaton_states,num_automaton_edges,num_ts_regions,"
+        << "avg_capabilities_per_robot,capability_homogeneity,"
+        << "method,computation_time_seconds,makespan,makespan_ratio,memory_MB,solved,"
+        << "sampler_budget_multiplier\n";
+
+    for (const auto& run : runs_) {
+        const auto& eff = run.metrics.getSubtreeEfficiency();
+        const auto& q = run.metrics.getSolutionQuality();
+        const auto& iv = run.metrics.getIndependentVariables();
+
+        // The value of whichever parameter this sweep varies
+        std::string independent_value;
+        auto it = run.parameters.find(run.independent_variable);
+        if (it != run.parameters.end()) independent_value = it->second;
+
+        const std::string names[3] = {"tree", "product", "sampler"};
+        const double makespans[3] = {
+            q.tree_makespan_seconds,
+            q.product_makespan_seconds,
+            q.random_sampling_makespan_seconds
+        };
+        const double times[3] = {
+            run.metrics.total_computation_time_ms / 1000.0,
+            run.metrics.product_computation_time_ms / 1000.0,
+            run.metrics.random_sampling_computation_time_seconds
+        };
+        const double memory[3] = {
+            eff.task_allocation_algorithm_memory_MB,
+            eff.full_product_automaton_memory_MB,
+            eff.random_sampling_memory_MB
+        };
+        // A skipped product leaves its makespan at zero, which would otherwise read as a
+        // perfect result rather than as an instance it could not handle
+        const bool solved[3] = {
+            q.tree_makespan_seconds > 0.0,
+            eff.full_product_automaton_nodes > 0 && q.product_makespan_seconds > 0.0,
+            q.random_sampling_makespan_seconds > 0.0
+        };
+
+        double best = 0.0;
+        for (int i = 0; i < 3; ++i) {
+            if (solved[i] && (best == 0.0 || makespans[i] < best)) best = makespans[i];
+        }
+
+        for (int i = 0; i < 3; ++i) {
+            out << getCategoryName()
+                << "," << run.run_id
+                << "," << run.trial_number
+                << "," << run.independent_variable
+                << "," << independent_value
+                << "," << iv.num_robots
+                << "," << iv.num_automaton_states
+                << "," << iv.num_automaton_edges
+                << "," << iv.num_ts_regions
+                << "," << iv.avg_capabilities_per_robot
+                << "," << iv.capability_homogeneity
+                << "," << names[i]
+                << "," << times[i]
+                << "," << makespans[i]
+                << ",";
+            // Left blank rather than zero when there is nothing meaningful to divide
+            if (solved[i] && best > 0.0) out << (makespans[i] / best);
+            out << "," << memory[i]
+                << "," << (solved[i] ? 1 : 0)
+                << "," << (names[i] == "sampler" ? eff.random_sampling_budget_multiplier : 0.0)
+                << "\n";
+        }
+    }
+
+    out.close();
+    std::cout << "Exported combined comparison to: " << output_filename << std::endl;
 }
 
 void TestRunManager::exportStatisticsToCSV(const std::string& output_filename) const {
@@ -428,18 +543,244 @@ void TestRunManager::createCategoryDirectory() {
     }
 }
 
+namespace {
+
+// One field per line as key=value, so a file stays readable and tolerates fields being
+// added or reordered later: unknown keys are ignored and missing ones keep their defaults.
+void writeField(std::ostringstream& oss, const std::string& key, const std::string& value) {
+    std::string flat = value;
+    // A newline inside a value would be read back as the start of the next field
+    std::replace(flat.begin(), flat.end(), '\n', ' ');
+    std::replace(flat.begin(), flat.end(), '\r', ' ');
+    oss << key << "=" << flat << "\n";
+}
+
+template <typename T>
+void writeField(std::ostringstream& oss, const std::string& key, T value) {
+    oss << key << "=" << value << "\n";
+}
+
+template <typename T>
+void writeVector(std::ostringstream& oss, const std::string& key, const std::vector<T>& values) {
+    oss << key << "=";
+    for (size_t i = 0; i < values.size(); ++i) {
+        if (i) oss << ",";
+        oss << values[i];
+    }
+    oss << "\n";
+}
+
+// Readers leave the target untouched when the key is absent, so an older file still loads
+void readDouble(const std::map<std::string, std::string>& f, const std::string& key, double& out) {
+    auto it = f.find(key);
+    if (it != f.end() && !it->second.empty()) out = std::stod(it->second);
+}
+
+void readInt(const std::map<std::string, std::string>& f, const std::string& key, int& out) {
+    auto it = f.find(key);
+    if (it != f.end() && !it->second.empty()) out = std::stoi(it->second);
+}
+
+void readLongLong(const std::map<std::string, std::string>& f, const std::string& key, long long& out) {
+    auto it = f.find(key);
+    if (it != f.end() && !it->second.empty()) out = std::stoll(it->second);
+}
+
+void readUInt32(const std::map<std::string, std::string>& f, const std::string& key, uint32_t& out) {
+    auto it = f.find(key);
+    if (it != f.end() && !it->second.empty()) out = static_cast<uint32_t>(std::stoul(it->second));
+}
+
+void readString(const std::map<std::string, std::string>& f, const std::string& key, std::string& out) {
+    auto it = f.find(key);
+    if (it != f.end()) out = it->second;
+}
+
+template <typename T>
+void readVector(const std::map<std::string, std::string>& f, const std::string& key, std::vector<T>& out) {
+    auto it = f.find(key);
+    if (it == f.end() || it->second.empty()) return;
+    out.clear();
+    std::istringstream iss(it->second);
+    std::string item;
+    while (std::getline(iss, item, ',')) {
+        if (item.empty()) continue;
+        out.push_back(static_cast<T>(std::stod(item)));
+    }
+}
+
+}  // namespace
+
 void TestRunManager::saveCategoryData() const {
-    // TODO: Save runs to individual text files
+    if (runs_.empty()) return;
+
+    fs::create_directories(getCategoryDirPath());
+
+    // Only the most recent run is new, so rewriting the whole category would be wasted work
+    const TestRun& run = runs_.back();
+    std::ofstream out(getRunFilename(run.run_id));
+    if (!out) {
+        std::cerr << "Could not write run file: " << getRunFilename(run.run_id) << std::endl;
+        return;
+    }
+    out << serializeTestRun(run);
+    out.close();
 }
 
 std::string TestRunManager::serializeTestRun(const TestRun& run) const {
-    (void)run;  // Unused parameter
-    // TODO: Serialize TestRun to text format
-    return "";
+    std::ostringstream oss;
+    oss << std::setprecision(10);
+
+    writeField(oss, "run_id", run.run_id);
+    writeField(oss, "trial_number", run.trial_number);
+    writeField(oss, "timestamp", run.timestamp);
+    writeField(oss, "independent_variable", run.independent_variable);
+    writeField(oss, "notes", run.notes);
+
+    for (const auto& entry : run.parameters) {
+        writeField(oss, "param." + entry.first, entry.second);
+    }
+
+    const AlgorithmMetrics& m = run.metrics;
+    writeField(oss, "time.total_computation_time_ms", m.total_computation_time_ms);
+    writeField(oss, "time.product_computation_time_ms", m.product_computation_time_ms);
+    writeField(oss, "time.random_sampling_computation_time_seconds", m.random_sampling_computation_time_seconds);
+
+    const auto& iv = m.getIndependentVariables();
+    writeField(oss, "iv.num_automaton_states", iv.num_automaton_states);
+    writeField(oss, "iv.num_automaton_edges", iv.num_automaton_edges);
+    writeField(oss, "iv.total_required_capabilities", iv.total_required_capabilities);
+    writeField(oss, "iv.independent_required_capabilities", iv.independent_required_capabilities);
+    writeField(oss, "iv.num_atomic_propositions", iv.num_atomic_propositions);
+    writeField(oss, "iv.num_robots", iv.num_robots);
+    writeField(oss, "iv.total_robot_capabilities", iv.total_robot_capabilities);
+    writeField(oss, "iv.independent_robot_capabilities", iv.independent_robot_capabilities);
+    writeField(oss, "iv.num_ts_regions", iv.num_ts_regions);
+    writeField(oss, "iv.avg_capabilities_per_robot", iv.avg_capabilities_per_robot);
+    writeField(oss, "iv.capability_homogeneity", iv.capability_homogeneity);
+    writeField(oss, "iv.num_inter_task_constraints", iv.num_inter_task_constraints);
+
+    const auto& eff = m.getSubtreeEfficiency();
+    writeField(oss, "eff.total_nodes_planning", eff.total_nodes_planning);
+    writeField(oss, "eff.total_nodes_traversed", eff.total_nodes_traversed);
+    writeField(oss, "eff.total_nodes_pruned", eff.total_nodes_pruned);
+    writeField(oss, "eff.nodes_satisfying_ltl", eff.nodes_satisfying_ltl);
+    writeField(oss, "eff.task_allocation_algorithm_memory_MB", eff.task_allocation_algorithm_memory_MB);
+    writeField(oss, "eff.full_product_automaton_nodes", eff.full_product_automaton_nodes);
+    writeField(oss, "eff.full_product_automaton_edges", eff.full_product_automaton_edges);
+    writeField(oss, "eff.full_product_automaton_memory_MB", eff.full_product_automaton_memory_MB);
+    writeField(oss, "eff.random_sampling_iterations", eff.random_sampling_iterations);
+    writeField(oss, "eff.random_sampling_memory_MB", eff.random_sampling_memory_MB);
+    writeField(oss, "eff.random_sampling_budget_multiplier", eff.random_sampling_budget_multiplier);
+    writeField(oss, "eff.tree_computation_time_stddev_ms", eff.tree_computation_time_stddev_ms);
+    writeField(oss, "eff.random_sampling_computation_time_stddev", eff.random_sampling_computation_time_stddev);
+    writeField(oss, "eff.pruning_ratio", eff.pruning_ratio);
+    writeField(oss, "eff.explored_product_ratio", eff.explored_product_ratio);
+    writeField(oss, "eff.tree_product_ratio", eff.tree_product_ratio);
+    writeField(oss, "eff.memory_reduction_ratio", eff.memory_reduction_ratio);
+    writeField(oss, "eff.optimality_gap_percent", eff.optimality_gap_percent);
+    writeField(oss, "eff.runtime_speedup", eff.runtime_speedup);
+    writeField(oss, "eff.percent_nodes_in_tree", eff.percent_nodes_in_tree);
+    writeField(oss, "eff.state_space_reduction", eff.state_space_reduction);
+
+    const auto& q = m.getSolutionQuality();
+    writeField(oss, "qual.tree_makespan_seconds", q.tree_makespan_seconds);
+    writeField(oss, "qual.product_makespan_seconds", q.product_makespan_seconds);
+    writeField(oss, "qual.random_sampling_makespan_seconds", q.random_sampling_makespan_seconds);
+    writeField(oss, "qual.random_sampling_makespan_stddev", q.random_sampling_makespan_stddev);
+    writeField(oss, "qual.sum_of_travel_times_seconds", q.sum_of_travel_times_seconds);
+    writeField(oss, "qual.total_travel_distance", q.total_travel_distance);
+    writeField(oss, "qual.max_individual_travel_distance", q.max_individual_travel_distance);
+    writeField(oss, "qual.load_balance_variance", q.load_balance_variance);
+    writeField(oss, "qual.robots_utilized", q.robots_utilized);
+    writeField(oss, "qual.robot_utilization_ratio", q.robot_utilization_ratio);
+    writeVector(oss, "qual.individual_travel_times", q.individual_travel_times);
+    writeVector(oss, "qual.individual_travel_distances", q.individual_travel_distances);
+    writeVector(oss, "qual.tasks_per_robot", q.tasks_per_robot);
+
+    return oss.str();
 }
 
 TestRunManager::TestRun TestRunManager::deserializeTestRun(const std::string& str) const {
-    (void)str;  // Unused parameter
-    // TODO: Deserialize text to TestRun
-    return TestRun{};
+    TestRun run{};
+
+    // Split into key=value pairs on the first '=' of each line, so values may contain '='
+    std::map<std::string, std::string> fields;
+    std::istringstream iss(str);
+    std::string line;
+    while (std::getline(iss, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        size_t eq = line.find('=');
+        if (eq == std::string::npos) continue;
+        fields[line.substr(0, eq)] = line.substr(eq + 1);
+    }
+
+    readInt(fields, "run_id", run.run_id);
+    readInt(fields, "trial_number", run.trial_number);
+    readString(fields, "timestamp", run.timestamp);
+    readString(fields, "independent_variable", run.independent_variable);
+    readString(fields, "notes", run.notes);
+
+    const std::string prefix = "param.";
+    for (const auto& entry : fields) {
+        if (entry.first.compare(0, prefix.size(), prefix) == 0) {
+            run.parameters[entry.first.substr(prefix.size())] = entry.second;
+        }
+    }
+
+    AlgorithmMetrics& m = run.metrics;
+    readDouble(fields, "time.total_computation_time_ms", m.total_computation_time_ms);
+    readDouble(fields, "time.product_computation_time_ms", m.product_computation_time_ms);
+    readDouble(fields, "time.random_sampling_computation_time_seconds", m.random_sampling_computation_time_seconds);
+
+    readInt(fields, "iv.num_automaton_states", m.iv_.num_automaton_states);
+    readInt(fields, "iv.num_automaton_edges", m.iv_.num_automaton_edges);
+    readInt(fields, "iv.total_required_capabilities", m.iv_.total_required_capabilities);
+    readInt(fields, "iv.independent_required_capabilities", m.iv_.independent_required_capabilities);
+    readInt(fields, "iv.num_atomic_propositions", m.iv_.num_atomic_propositions);
+    readInt(fields, "iv.num_robots", m.iv_.num_robots);
+    readInt(fields, "iv.total_robot_capabilities", m.iv_.total_robot_capabilities);
+    readInt(fields, "iv.independent_robot_capabilities", m.iv_.independent_robot_capabilities);
+    readInt(fields, "iv.num_ts_regions", m.iv_.num_ts_regions);
+    readDouble(fields, "iv.avg_capabilities_per_robot", m.iv_.avg_capabilities_per_robot);
+    readDouble(fields, "iv.capability_homogeneity", m.iv_.capability_homogeneity);
+    readInt(fields, "iv.num_inter_task_constraints", m.iv_.num_inter_task_constraints);
+
+    readLongLong(fields, "eff.total_nodes_planning", m.subtree_efficiency_.total_nodes_planning);
+    readLongLong(fields, "eff.total_nodes_traversed", m.subtree_efficiency_.total_nodes_traversed);
+    readLongLong(fields, "eff.total_nodes_pruned", m.subtree_efficiency_.total_nodes_pruned);
+    readLongLong(fields, "eff.nodes_satisfying_ltl", m.subtree_efficiency_.nodes_satisfying_ltl);
+    readDouble(fields, "eff.task_allocation_algorithm_memory_MB", m.subtree_efficiency_.task_allocation_algorithm_memory_MB);
+    readLongLong(fields, "eff.full_product_automaton_nodes", m.subtree_efficiency_.full_product_automaton_nodes);
+    readLongLong(fields, "eff.full_product_automaton_edges", m.subtree_efficiency_.full_product_automaton_edges);
+    readDouble(fields, "eff.full_product_automaton_memory_MB", m.subtree_efficiency_.full_product_automaton_memory_MB);
+    readUInt32(fields, "eff.random_sampling_iterations", m.subtree_efficiency_.random_sampling_iterations);
+    readDouble(fields, "eff.random_sampling_memory_MB", m.subtree_efficiency_.random_sampling_memory_MB);
+    readDouble(fields, "eff.random_sampling_budget_multiplier", m.subtree_efficiency_.random_sampling_budget_multiplier);
+    readDouble(fields, "eff.tree_computation_time_stddev_ms", m.subtree_efficiency_.tree_computation_time_stddev_ms);
+    readDouble(fields, "eff.random_sampling_computation_time_stddev", m.subtree_efficiency_.random_sampling_computation_time_stddev);
+    readDouble(fields, "eff.pruning_ratio", m.subtree_efficiency_.pruning_ratio);
+    readDouble(fields, "eff.explored_product_ratio", m.subtree_efficiency_.explored_product_ratio);
+    readDouble(fields, "eff.tree_product_ratio", m.subtree_efficiency_.tree_product_ratio);
+    readDouble(fields, "eff.memory_reduction_ratio", m.subtree_efficiency_.memory_reduction_ratio);
+    readDouble(fields, "eff.optimality_gap_percent", m.subtree_efficiency_.optimality_gap_percent);
+    readDouble(fields, "eff.runtime_speedup", m.subtree_efficiency_.runtime_speedup);
+    readDouble(fields, "eff.percent_nodes_in_tree", m.subtree_efficiency_.percent_nodes_in_tree);
+    readLongLong(fields, "eff.state_space_reduction", m.subtree_efficiency_.state_space_reduction);
+
+    readDouble(fields, "qual.tree_makespan_seconds", m.solution_quality_.tree_makespan_seconds);
+    readDouble(fields, "qual.product_makespan_seconds", m.solution_quality_.product_makespan_seconds);
+    readDouble(fields, "qual.random_sampling_makespan_seconds", m.solution_quality_.random_sampling_makespan_seconds);
+    readDouble(fields, "qual.random_sampling_makespan_stddev", m.solution_quality_.random_sampling_makespan_stddev);
+    readDouble(fields, "qual.sum_of_travel_times_seconds", m.solution_quality_.sum_of_travel_times_seconds);
+    readDouble(fields, "qual.total_travel_distance", m.solution_quality_.total_travel_distance);
+    readDouble(fields, "qual.max_individual_travel_distance", m.solution_quality_.max_individual_travel_distance);
+    readDouble(fields, "qual.load_balance_variance", m.solution_quality_.load_balance_variance);
+    readInt(fields, "qual.robots_utilized", m.solution_quality_.robots_utilized);
+    readDouble(fields, "qual.robot_utilization_ratio", m.solution_quality_.robot_utilization_ratio);
+    readVector(fields, "qual.individual_travel_times", m.solution_quality_.individual_travel_times);
+    readVector(fields, "qual.individual_travel_distances", m.solution_quality_.individual_travel_distances);
+    readVector(fields, "qual.tasks_per_robot", m.solution_quality_.tasks_per_robot);
+
+    return run;
 }

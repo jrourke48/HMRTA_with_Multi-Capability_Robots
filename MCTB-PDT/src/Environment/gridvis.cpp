@@ -1,9 +1,13 @@
 #include "Environment/gridvis.h"
 #include "Environment/DStarGridWorld.h"
 #include <raylib.h>
+#include <algorithm>
 #include <iostream>
 #include <vector>
 #include <cmath>
+#include <filesystem>
+#include <iomanip>
+#include <sstream>
 
 // Helper: Convert grid point to screen pixel coordinates
 static void gridToScreen(
@@ -53,26 +57,46 @@ static std::vector<Point> compute_dstar_path_single(
 RobotPathMap compute_dstar_paths(
     const Environment& env,
     const MultiRobotSystem& mrs,
-    const std::vector<Tree_Node*>& optimalPath
+    const std::vector<Tree_Node*>& optimalPath,
+    RobotBarrierMap* barriers
 ) {
     RobotPathMap robotPaths;
-    
+
     // Initialize empty paths for all robots
     for (uint32_t i = 0; i < mrs.getNumRobots(); ++i) {
         robotPaths[i] = std::vector<Point>();
     }
+
+    if (barriers) {
+        barriers->clear();
+    }
+
+    // Record where a robot has to wait for the rest of its group. This runs for every robot
+    // allocated to the step, including ones whose D* segment could not be computed: skipping
+    // them would leave the rest of the group waiting on a robot that never reports arrival.
+    auto recordBarrier = [&](uint32_t robotId, size_t stepIndex) {
+        if (!barriers) {
+            return;
+        }
+        const std::vector<Point>& path = robotPaths[robotId];
+        (*barriers)[robotId].emplace_back(stepIndex, path.empty() ? 0 : path.size() - 1);
+    };
     
-    // Track the last position of each robot for continuous path segments
+    // Track the last position of each robot for continuous path segments.
+    // Seed from the configured start positions, not the current ones: the planner moves the
+    // shared robot objects as it explores and leaves them wherever the search ended, so
+    // getCurrentPosition() here would start the animation from the wrong place.
     std::map<uint32_t, Point> robotLastPositions;
     for (uint32_t i = 0; i < mrs.getNumRobots(); ++i) {
-        const std::vector<Point>& positions = mrs.getRobotPositions();
-        if (i < positions.size()) {
-            robotLastPositions[i] = positions[i];
+        const std::vector<Robot*>& robots = mrs.getRobots();
+        if (i < robots.size()) {
+            robotLastPositions[i] = robots[i]->getStartPosition();
         }
     }
     
     // For each node in the optimal path
-    for (const Tree_Node* node : optimalPath) {
+    for (size_t stepIndex = 0; stepIndex < optimalPath.size(); ++stepIndex) {
+        const Tree_Node* node = optimalPath[stepIndex];
         if (!node) {
             continue;
         }
@@ -92,25 +116,28 @@ RobotPathMap compute_dstar_paths(
             if (robotLastPositions.count(robotId)) {
                 currentPos = robotLastPositions[robotId];
             } else {
-                const std::vector<Point>& positions = mrs.getRobotPositions();
-                if (robotId < positions.size()) {
-                    currentPos = positions[robotId];
+                const std::vector<Robot*>& robots = mrs.getRobots();
+                if (robotId < robots.size()) {
+                    currentPos = robots[robotId]->getStartPosition();
                 } else {
+                    recordBarrier(robotId, stepIndex);
                     continue;
                 }
             }
-            
+
             // Get goal position from node (updated with circular arrangement)
             if (robotId >= nodePositions.size()) {
+                recordBarrier(robotId, stepIndex);
                 continue;
             }
             Point goalPos = nodePositions[robotId];
-            
+
             // Compute D* path from current position to goal
             std::vector<Point> segmentPath = compute_dstar_path_single(env, currentPos, goalPos);
-            
+
             // Skip if path is empty
             if (segmentPath.empty()) {
+                recordBarrier(robotId, stepIndex);
                 continue;
             }
             
@@ -121,7 +148,10 @@ RobotPathMap compute_dstar_paths(
                 }
                 robotPaths[robotId].push_back(segmentPath[i]);
             }
-            
+
+            // The end of this segment is where the robot waits for the rest of its group
+            recordBarrier(robotId, stepIndex);
+
             // Update robot's last position to where it ends up from task allocation
             if (robotId < nodePositions.size()) {
                 robotLastPositions[robotId] = nodePositions[robotId];
@@ -143,7 +173,9 @@ void visualize_environment(
     const MultiRobotSystem& mrs,
     const std::vector<Tree_Node*>& optimalPath,
     const RobotPathMap& robotPaths,
-    const char* windowTitle
+    const char* windowTitle,
+    const std::string& snapshotDirectory,
+    const RobotBarrierMap& robotBarriers
 ) {
     const GridWorld* gridWorld = env.getGridWorld();
     if (!gridWorld) {
@@ -177,8 +209,10 @@ void visualize_environment(
 
     // Compute paths if not provided
     RobotPathMap paths = robotPaths;
+    RobotBarrierMap barriers = robotBarriers;
     if (paths.empty() && !optimalPath.empty()) {
-        paths = compute_dstar_paths(env, mrs, optimalPath);
+        barriers.clear();
+        paths = compute_dstar_paths(env, mrs, optimalPath, &barriers);
     }
 
     // Animation state: track current position index for each robot on its path
@@ -188,20 +222,82 @@ void visualize_environment(
         robotPathIndices[i] = 0;
         robotPathProgress[i] = 0.0f;
     }
-    float animationSpeed = 0.02f;  // Fraction of waypoint to move per frame (0.0-1.0)
 
-    // Color palette for TS states
-    Color stateColors[] = {
-        Color{100, 200, 100, 180},  // green
-        Color{100, 150, 255, 180},  // blue
-        Color{255, 200, 100, 180},  // orange
-        Color{200, 100, 255, 180},  // purple
-        Color{255, 100, 150, 180},  // pink
-        Color{100, 255, 200, 180},  // cyan
-        Color{200, 200, 100, 180},  // olive
-        Color{150, 100, 200, 180},  // violet
+    // Synchronization state. barrierCursor[r] is the barrier robot r is currently working
+    // toward; stepCohort[s] is every robot allocated to step s. A robot that has reached its
+    // barrier holds there until all of stepCohort[s] have reached theirs. With no barriers
+    // supplied this stays empty and every robot runs freely, as it did before.
+    std::map<uint32_t, size_t> barrierCursor;
+    std::map<size_t, std::vector<uint32_t>> stepCohort;
+    for (const auto& [robotId, robotBarrierList] : barriers) {
+        barrierCursor[robotId] = 0;
+        for (const auto& [stepIndex, pathIndex] : robotBarrierList) {
+            (void)pathIndex;
+            stepCohort[stepIndex].push_back(robotId);
+        }
+    }
+
+    // Where robot r has to be to count as arrived at step s, or npos if r has no barrier there
+    auto barrierIndexFor = [&barriers](uint32_t robotId, size_t stepIndex) -> size_t {
+        auto it = barriers.find(robotId);
+        if (it == barriers.end()) {
+            return std::string::npos;
+        }
+        for (const auto& [step, pathIndex] : it->second) {
+            if (step == stepIndex) {
+                return pathIndex;
+            }
+        }
+        return std::string::npos;
     };
-    const int numStateColors = sizeof(stateColors) / sizeof(stateColors[0]);
+
+    // A step releases once every robot allocated to it has reached its own barrier
+    auto stepComplete = [&](size_t stepIndex) {
+        auto cohort = stepCohort.find(stepIndex);
+        if (cohort == stepCohort.end()) {
+            return true;
+        }
+        for (uint32_t robotId : cohort->second) {
+            const size_t needed = barrierIndexFor(robotId, stepIndex);
+            if (needed != std::string::npos && robotPathIndices[robotId] < needed) {
+                return false;
+            }
+        }
+        return true;
+    };
+
+    // The barrier robot r is held at right now, or npos if it is free to keep moving
+    auto activeBarrierFor = [&](uint32_t robotId) -> size_t {
+        auto it = barriers.find(robotId);
+        if (it == barriers.end()) {
+            return std::string::npos;
+        }
+        const size_t cursor = barrierCursor[robotId];
+        if (cursor >= it->second.size()) {
+            return std::string::npos;  // past its last barrier
+        }
+        return it->second[cursor].second;
+    };
+    float animationSpeed = 0.02f;  // Fraction of waypoint to move per frame (0.0-1.0)
+    constexpr uint32_t snapshotIntervals = 10;
+    uint32_t nextSnapshot = 0;
+    if (!snapshotDirectory.empty()) {
+        std::filesystem::create_directories(snapshotDirectory);
+    }
+
+    // TS regions share one flat beige fill; the bold black borders below separate them,
+    // which keeps the robot path overlays readable
+    const Color beige = Color{238, 230, 209, 255};
+    constexpr unsigned char pathAlpha = 110;  // translucent, so region labels show through
+
+    // Flatten a robot color against the beige background at the path's alpha. Robots and
+    // legend swatches use this so they read as the same color as the trail they leave.
+    auto soften = [&beige](Color c) {
+        auto mix = [](unsigned char fg, unsigned char bg) {
+            return (unsigned char)((fg * pathAlpha + bg * (255 - pathAlpha)) / 255);
+        };
+        return Color{mix(c.r, beige.r), mix(c.g, beige.g), mix(c.b, beige.b), 255};
+    };
 
     // Color palette for robots (distinct and visible)
     Color robotColors[] = {
@@ -218,16 +314,37 @@ void visualize_environment(
 
     while (!WindowShouldClose()) {
         BeginDrawing();
-        ClearBackground(RAYWHITE);
+        ClearBackground(beige);
 
-        // Update robot positions along their paths
+        // Update robot positions along their paths, holding each one at its barrier until
+        // the rest of the robots allocated to that step have arrived
         for (uint32_t i = 0; i < mrs.getNumRobots(); ++i) {
-            if (paths.count(i) && paths[i].size() > 1 && robotPathIndices[i] < paths[i].size() - 1) {
-                robotPathProgress[i] += animationSpeed;
-                if (robotPathProgress[i] >= 1.0f) {
-                    robotPathIndices[i]++;  // Move to next waypoint
-                    robotPathProgress[i] -= 1.0f;  // Reset progress
-                }
+            if (!paths.count(i) || paths[i].size() <= 1 || robotPathIndices[i] >= paths[i].size() - 1) {
+                continue;
+            }
+
+            const size_t holdAt = activeBarrierFor(i);
+            if (holdAt != std::string::npos && robotPathIndices[i] >= holdAt) {
+                robotPathProgress[i] = 0.0f;  // parked at the task location, waiting
+                continue;
+            }
+
+            robotPathProgress[i] += animationSpeed;
+            if (robotPathProgress[i] >= 1.0f) {
+                robotPathIndices[i]++;  // Move to next waypoint
+                robotPathProgress[i] -= 1.0f;  // Reset progress
+            }
+        }
+
+        // Release any step whose whole group has now arrived
+        for (auto& [robotId, cursor] : barrierCursor) {
+            auto it = barriers.find(robotId);
+            if (it == barriers.end() || cursor >= it->second.size()) {
+                continue;
+            }
+            const auto& [stepIndex, pathIndex] = it->second[cursor];
+            if (robotPathIndices[robotId] >= pathIndex && stepComplete(stepIndex)) {
+                ++cursor;
             }
         }
 
@@ -241,12 +358,10 @@ void visualize_environment(
                 // Fill cell based on obstacle status and TS state
                 if (env.isObstacle(cellPos)) {
                     DrawRectangle(screenX, screenY, cellSize, cellSize, BLACK);
-                    DrawRectangleLines(screenX, screenY, cellSize, cellSize, RED);  // Red outline for obstacles
                 } else {
-                    // Color by TS state
-                    uint32_t stateId = env.gridToTSStateId(cellPos);
-                    Color stateCol = stateColors[stateId % numStateColors];
-                    DrawRectangle(screenX, screenY, cellSize, cellSize, stateCol);
+                    // All TS regions share one flat beige fill; regions are told apart by
+                    // the bold borders and labels rather than by color
+                    DrawRectangle(screenX, screenY, cellSize, cellSize, beige);
                     DrawRectangleLines(screenX, screenY, cellSize, cellSize, LIGHTGRAY);
                 }
             }
@@ -317,8 +432,8 @@ void visualize_environment(
         // Draw each robot's D* path
         for (const auto& [robotId, path] : paths) {
             Color pathColor = robotColors[robotId % numRobotColors];
-            // Use full opacity to match robot color exactly
-            pathColor.a = 255;
+            // Translucent so the region labels and overlapping paths stay visible underneath
+            pathColor.a = pathAlpha;
             
             for (const Point& p : path) {
                 int screenX, screenY;
@@ -356,9 +471,9 @@ void visualize_environment(
                 robotPos = paths[i][robotPathIndices[i]];
             } else {
                 // Fallback to starting position if no path
-                std::vector<Point> robotPositions = mrs.getRobotPositions();
-                if (i < robotPositions.size()) {
-                    robotPos = robotPositions[i];
+                const std::vector<Robot*>& robots = mrs.getRobots();
+                if (i < robots.size()) {
+                    robotPos = robots[i]->getStartPosition();
                 } else {
                     continue;  // Skip if no position available
                 }
@@ -372,12 +487,13 @@ void visualize_environment(
             int centerY = screenY + cellSize / 2;
             int radius = cellSize / 3;
 
-            DrawCircle(centerX, centerY, radius, robotColor);
+            DrawCircle(centerX, centerY, radius, soften(robotColor));
             DrawCircleLines(centerX, centerY, radius + 2, BLACK);
 
             // Draw robot ID
-            std::string robotLabel = mrs.getRobot(i + 1)->getName();
-            DrawText(robotLabel.c_str(), centerX - 8, centerY - 8, 14, WHITE);
+            // Index by position: robot ids are caller-defined and need not equal the index
+            std::string robotLabel = mrs.getRobots()[i]->getName();
+            DrawText(robotLabel.c_str(), centerX - 8, centerY - 8, 14, BLACK);
         }
 
         // Draw legend
@@ -388,13 +504,39 @@ void visualize_environment(
         // Robot legend
         for (uint32_t i = 0; i < mrs.getNumRobots() && i < 6; ++i) {
             Color robotColor = robotColors[i % numRobotColors];
-            DrawCircle(17, legendY + 8, 5, robotColor);
-            std::string label = mrs.getRobot(i)->getName();
+            DrawCircle(17, legendY + 8, 5, soften(robotColor));
+            // Index by position: robot ids are caller-defined and need not equal the index
+            std::string label = mrs.getRobots()[i]->getName();
             DrawText(label.c_str(), 30, legendY, 12, BLACK);
             legendY += 20;
         }
 
         EndDrawing();
+
+        if (!snapshotDirectory.empty() && nextSnapshot <= snapshotIntervals) {
+            double totalProgress = 0.0;
+            size_t activeRobotPaths = 0;
+            for (const auto& [robotId, path] : paths) {
+                if (path.size() < 2) continue;
+                const double robotProgress =
+                    (robotPathIndices[robotId] + robotPathProgress[robotId]) / (path.size() - 1);
+                totalProgress += std::min(robotProgress, 1.0);
+                ++activeRobotPaths;
+            }
+
+            if (activeRobotPaths > 0) {
+                const double routeProgress = totalProgress / activeRobotPaths;
+                const double targetProgress = static_cast<double>(nextSnapshot) / snapshotIntervals;
+                if (routeProgress >= targetProgress) {
+                    std::ostringstream filename;
+                    filename << snapshotDirectory << "/allocation_frame_"
+                             << std::setw(2) << std::setfill('0') << nextSnapshot << ".png";
+                    TakeScreenshot(filename.str().c_str());
+                    std::cout << "Saved allocation snapshot: " << filename.str() << std::endl;
+                    ++nextSnapshot;
+                }
+            }
+        }
     }
 
     CloseWindow();

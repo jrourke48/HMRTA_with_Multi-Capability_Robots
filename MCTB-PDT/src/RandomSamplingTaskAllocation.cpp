@@ -1,8 +1,12 @@
 #include "RandomSamplingAlgo/RandomSamplingTaskAllocation.h"
 #include "RandomSamplingAlgo/RandomNode.h"
 #include <algorithm>
+#include <limits>
 #include <map>
 #include <ctime>
+#include <cstdlib>
+#include <fstream>
+#include <sstream>
 
 //========================
 // CONSTRUCTORS & DESTRUCTOR
@@ -97,6 +101,10 @@ RandomSamplingTaskAllocation::~RandomSamplingTaskAllocation() {
  * a lasso: a prefix followed by a cycle that revisits the accepting state forever.
  */
 void RandomSamplingTaskAllocation::run() {
+    // Another planner may have run on this team first and left the robots parked at its plan's
+    // destinations; sampling from there would charge nothing for work already done, so put the
+    // team back at its start positions before reading them
+    multiRobotSystem->resetRobotPositions();
     // Taken once, so every sampled path starts from the same configuration even if something
     // else moves the team while planning
     initialPositions = multiRobotSystem->getRobotPositions();
@@ -106,6 +114,21 @@ void RandomSamplingTaskAllocation::run() {
         runFinitePathPlanner();
     } else {
         runInfinitePathPlanner();
+    }
+
+    // Publish the cheapest plan found over all accepting states, so callers get one figure
+    // without repeating the reduction. The paths themselves stay owned by the map
+    optimalMakespan = 0;
+    bool anyPlanned = false;
+    for (const auto& entry : paths) {
+        const TaskAllocPath& prefix = entry.second.first;
+        const TaskAllocPath& suffix = entry.second.second;
+        if (prefix.path.empty() && suffix.path.empty()) continue;
+        uint16_t total = prefix.makespan + suffix.makespan;
+        if (!anyPlanned || total < optimalMakespan) {
+            optimalMakespan = total;
+            anyPlanned = true;
+        }
     }
 }
 
@@ -176,7 +199,7 @@ void RandomSamplingTaskAllocation::runFinitePathPlanner() {
                 for (const auto& edge : curNode->getEdges()) {
                     Node* nextNode = searchNBA->getNode(edge.getDstId());
                     if (!nextNode) continue;
-                    uint16_t distToGoal = getMinLengthPath(nextNode, goalNode).pathLength;
+                    uint16_t distToGoal = minDistance(nextNode, goalNode);
                     if (distToGoal != 0 && distToGoal <= remaining) {
                         candidates.push_back(nextNode);
                     }
@@ -210,7 +233,9 @@ void RandomSamplingTaskAllocation::runFinitePathPlanner() {
         }
         
         // Increment the iteration counter
-        Iterations++;
+        // Saturate rather than wrap: the loop is governed by the time budget, so a wrap would
+        // leave the reported count as the true count modulo 65536 with no other symptom
+        if (Iterations < std::numeric_limits<uint16_t>::max()) Iterations++;
         computationTime = static_cast<double>(clock() - startTime) / CLOCKS_PER_SEC;
     }
 }
@@ -243,7 +268,7 @@ void RandomSamplingTaskAllocation::runInfinitePathPlanner() {
         for (const auto& edge : acceptingNode->getEdges()) {
             Node* nextNode = searchNBA->getNode(edge.getDstId());
             if (!nextNode) continue;
-            uint16_t distBack = getMinLengthPath(nextNode, acceptingNode).pathLength;
+            uint16_t distBack = minDistance(nextNode, acceptingNode);
             if (distBack != 0 && (minSuffixLength[i] == 0 || distBack + 1 < minSuffixLength[i])) {
                 minSuffixLength[i] = distBack + 1;
             }
@@ -256,7 +281,7 @@ void RandomSamplingTaskAllocation::runInfinitePathPlanner() {
         if (acceptingState == initialState) {
             minPrefixLength[i] = minSuffixLength[i];
         } else {
-            minPrefixLength[i] = getMinLengthPath(searchNBA->getNode(initialState), acceptingNode).pathLength;
+            minPrefixLength[i] = minDistance(searchNBA->getNode(initialState), acceptingNode);
         }
         TaskAllocPath minPrePath{minPrefixLength[i], std::vector<Random_Node*>(), 0};
         addPath(acceptingState, minPrePath, minSufPath);
@@ -332,7 +357,9 @@ void RandomSamplingTaskAllocation::runInfinitePathPlanner() {
         }
 
         // Increment the iteration counter
-        Iterations++;
+        // Saturate rather than wrap: the loop is governed by the time budget, so a wrap would
+        // leave the reported count as the true count modulo 65536 with no other symptom
+        if (Iterations < std::numeric_limits<uint16_t>::max()) Iterations++;
         computationTime = static_cast<double>(clock() - startTime) / CLOCKS_PER_SEC;
     }
 }
@@ -385,7 +412,7 @@ RandomSamplingTaskAllocation::TaskAllocPath RandomSamplingTaskAllocation::buildR
         for (const auto& edge : curNode->getEdges()) {
             Node* nextNode = searchNBA->getNode(edge.getDstId());
             if (!nextNode) continue;
-            uint16_t distToGoal = getMinLengthPath(nextNode, goalNode).pathLength;
+            uint16_t distToGoal = minDistance(nextNode, goalNode);
             if (distToGoal != 0 && distToGoal <= remaining) {
                 candidates.push_back(nextNode);
             }
@@ -424,66 +451,63 @@ RandomSamplingTaskAllocation::TaskAllocPath RandomSamplingTaskAllocation::buildR
  * @brief Breadth-first search for the fewest states between two automaton states.
  * @param srcNode  State to start from.
  * @param goalNode State to reach.
- * @return A path whose @c pathLength counts the states on a shortest route, 1 when the two are
- *         the same state, or 0 when the goal is unreachable or either argument is null.
- * @note Walks the pruned automaton when one exists, so only feasible transitions are counted.
+ * @return A path whose @c pathLength carries the distance. The node sequence is not recorded,
+ *         since every caller reads the length alone.
  */
 RandomSamplingTaskAllocation::TaskAllocPath RandomSamplingTaskAllocation::getMinLengthPath(Node* srcNode, Node* goalNode) {
-    if (!srcNode || !goalNode) {
-        return TaskAllocPath{0, std::vector<Random_Node*>(), 0};
-    }
-    
-    if (srcNode->getId() == goalNode->getId()) {
-        // Source is already the goal
-        return TaskAllocPath{1, {}, 0};
-    }
-    
+    return TaskAllocPath{minDistance(srcNode, goalNode), std::vector<Random_Node*>(), 0};
+}
+
+/**
+ * @brief Fewest states on any route between two automaton states.
+ * @param srcNode  State to start from.
+ * @param goalNode State to reach.
+ * @return The number of states on a shortest route, 1 when the two are the same state, or 0 when
+ *         the goal is unreachable or either argument is null.
+ * @note Walks the pruned automaton when one exists, so only feasible transitions are counted.
+ *       Results are cached because the path builders ask the same questions on every sample, and
+ *       the automaton does not change between them. Pruning clears the cache.
+ */
+uint16_t RandomSamplingTaskAllocation::minDistance(Node* srcNode, Node* goalNode) {
+    if (!srcNode || !goalNode) return 0;
+    if (srcNode->getId() == goalNode->getId()) return 1;
+
+    const std::pair<uint16_t, uint16_t> key{srcNode->getId(), goalNode->getId()};
+    auto cached = minDistanceCache.find(key);
+    if (cached != minDistanceCache.end()) return cached->second;
+
     // Search the pruned NBA so only feasible edges are followed
     BuchiAutomaton* searchNBA = (prunedNBA != nullptr) ? prunedNBA : nba;
 
-    // BFS to find shortest path
-    std::queue<std::pair<Node*, std::vector<Node*>>> q;
+    // Carrying a depth rather than the route itself avoids copying a growing vector into every
+    // queue entry, which is what made this the dominant cost of a sampling iteration
+    std::queue<std::pair<Node*, uint16_t>> q;
     std::set<uint16_t> visited;
-    
-    q.push({srcNode, {srcNode}});
+    q.push({srcNode, 1});
     visited.insert(srcNode->getId());
-    
-    while (!q.empty()) {
-        auto [currentNode, path] = q.front();
+
+    uint16_t distance = 0;
+    while (!q.empty() && distance == 0) {
+        auto [currentNode, depth] = q.front();
         q.pop();
-        
-        // Check all outgoing edges
+
         for (const auto& edge : currentNode->getEdges()) {
             Node* nextNode = searchNBA->getNode(edge.getDstId());
             if (!nextNode) continue;
-            
-            uint16_t nextNodeId = nextNode->getId();
-            
-            // Found goal
-            if (nextNodeId == goalNode->getId()) {
-                std::vector<Node*> completePath = path;
-                completePath.push_back(nextNode);
-                
-                // Create TaskAllocPath with empty Random_Node vector (will be filled during execution)
-                TaskAllocPath resultPath;
-                resultPath.pathLength = completePath.size();
-                resultPath.path = std::vector<Random_Node*>();
-                resultPath.makespan = 0;
-                return resultPath;
+
+            if (nextNode->getId() == goalNode->getId()) {
+                distance = static_cast<uint16_t>(depth + 1);
+                break;
             }
-            
-            // Visit unvisited neighbors
-            if (visited.find(nextNodeId) == visited.end()) {
-                visited.insert(nextNodeId);
-                std::vector<Node*> newPath = path;
-                newPath.push_back(nextNode);
-                q.push({nextNode, newPath});
+            if (visited.insert(nextNode->getId()).second) {
+                q.push({nextNode, static_cast<uint16_t>(depth + 1)});
             }
         }
     }
-    
-    // No path found
-    return TaskAllocPath{0, std::vector<Random_Node*>(), 0};
+
+    // Unreachable pairs are cached too: they are the most expensive, since they drain the queue
+    minDistanceCache[key] = distance;
+    return distance;
 }
 
 /**
@@ -500,6 +524,7 @@ void RandomSamplingTaskAllocation::pruneInfeasibleNBAPaths() {
     // Pruning again replaces the previous copy, which owns its own nodes
     delete prunedNBA;
     prunedNBA = new BuchiAutomaton(*nba);
+    minDistanceCache.clear();
     
     // Iterate through all edges in the pruned NBA and remove edges that cannot be satisfied
     // by any robot combination in the system
@@ -632,37 +657,58 @@ static bool coverRemainingCapabilities(const std::vector<std::vector<bool>>& req
                                        std::vector<bool>& used,
                                        std::vector<std::vector<bool>>& covered,
                                        std::vector<std::vector<uint8_t>>& robotsByAP) {
+    size_t selectedAP = required.size();
+    size_t selectedCapability = 0;
+    size_t fewestCandidates = std::numeric_limits<size_t>::max();
+
     for (size_t i = 0; i < required.size(); ++i) {
         for (size_t j = 0; j < required[i].size(); ++j) {
             if (!required[i][j] || covered[i][j]) continue;
 
-            // Proposition i still needs capability j, so some unused robot carrying j must take it
-            for (uint8_t r : order) {
-                if (used[r] || j >= caps[r].size() || !caps[r][j]) continue;
-
-                // Giving r to proposition i covers every capability of i that r happens to carry
-                std::vector<size_t> newlyCovered;
-                for (size_t k = 0; k < required[i].size(); ++k) {
-                    if (required[i][k] && !covered[i][k] && k < caps[r].size() && caps[r][k]) {
-                        covered[i][k] = true;
-                        newlyCovered.push_back(k);
-                    }
+            // Branch on the hardest remaining requirement and reject dead ends immediately.
+            size_t candidates = 0;
+            for (uint8_t robot : order) {
+                if (!used[robot] && j < caps[robot].size() && caps[robot][j]) {
+                    ++candidates;
                 }
-                used[r] = true;
-                robotsByAP[i].push_back(r + 1);  // teams carry 1-based robot ids
-
-                if (coverRemainingCapabilities(required, caps, order, used, covered, robotsByAP)) {
-                    return true;
-                }
-
-                robotsByAP[i].pop_back();
-                used[r] = false;
-                for (size_t k : newlyCovered) covered[i][k] = false;
             }
-            return false;  // nothing left can supply this capability
+            if (candidates == 0) return false;
+            if (candidates < fewestCandidates) {
+                selectedAP = i;
+                selectedCapability = j;
+                fewestCandidates = candidates;
+            }
         }
     }
-    return true;  // every proposition fully covered
+    if (selectedAP == required.size()) return true;
+
+    // Any valid assignment must give this AP one of the unused robots carrying the selected capability.
+    for (uint8_t robot : order) {
+        if (used[robot] || selectedCapability >= caps[robot].size() || !caps[robot][selectedCapability]) {
+            continue;
+        }
+
+        // Giving this robot to the selected AP may satisfy several of its requirements at once.
+        std::vector<size_t> newlyCovered;
+        for (size_t capability = 0; capability < required[selectedAP].size(); ++capability) {
+            if (required[selectedAP][capability] && !covered[selectedAP][capability] &&
+                capability < caps[robot].size() && caps[robot][capability]) {
+                covered[selectedAP][capability] = true;
+                newlyCovered.push_back(capability);
+            }
+        }
+        used[robot] = true;
+        robotsByAP[selectedAP].push_back(robot + 1);  // teams carry 1-based robot ids
+
+        if (coverRemainingCapabilities(required, caps, order, used, covered, robotsByAP)) {
+            return true;
+        }
+
+        robotsByAP[selectedAP].pop_back();
+        used[robot] = false;
+        for (size_t capability : newlyCovered) covered[selectedAP][capability] = false;
+    }
+    return false;
 }
 
 /**
@@ -887,4 +933,227 @@ void RandomSamplingTaskAllocation::addNoSufPath(uint16_t acceptingState, TaskAll
     // Create an empty suffix path (no nodes, zero length, zero makespan)
     TaskAllocPath emptySufPath{0, std::vector<Random_Node*>(), 0};
     paths[acceptingState] = {prePath, emptySufPath};
+}
+
+//========================
+// VISUALIZATION
+//========================
+
+namespace {
+
+/** Escape the characters Graphviz treats specially inside a quoted label. */
+std::string escapeDotLabel(const std::string& text) {
+    std::string out;
+    out.reserve(text.size());
+    for (size_t i = 0; i < text.size(); ++i) {
+        const char c = text[i];
+        // A backslash is kept only where it introduces one of our own "\n" line breaks
+        if (c == '\\' && i + 1 < text.size() && text[i + 1] == 'n') {
+            out += "\\n";
+            ++i;
+        } else if (c == '"' || c == '\\') {
+            out += '\\';
+            out += c;
+        } else if (c == '\n') {
+            out += "\\n";
+        } else {
+            out += c;
+        }
+    }
+    return out;
+}
+
+}  // namespace
+
+/**
+ * @brief Render the cheapest sampled plan as a Graphviz drawing.
+ *
+ * The plan is a lasso: a prefix that reaches an accepting state, then a suffix cycle repeated
+ * forever. Both chains are drawn, with a back edge closing the loop, because the repeating part
+ * is what carries the recurring cost and reading it as a straight line misstates the plan. A
+ * finite automaton has no suffix and is drawn as a plain chain.
+ *
+ * Each step shows the Buchi state entered, the propositions discharged there, the team sent to
+ * each one, and the makespan after the step. Teams carry 1-based robot ids, matching the rest
+ * of the system.
+ *
+ * @param filename Path without extension; writes <filename>.dot and, if Graphviz is installed,
+ *                 <filename>.png.
+ */
+void RandomSamplingTaskAllocation::visualizeOptimalPath(const std::string& filename) const {
+    // The cheapest accepting state, by the same reduction run() uses to publish the makespan
+    const std::pair<TaskAllocPath, TaskAllocPath>* best = nullptr;
+    uint16_t bestState = 0;
+    uint16_t bestTotal = 0;
+    for (const auto& entry : paths) {
+        const TaskAllocPath& prefixPath = entry.second.first;
+        const TaskAllocPath& suffixPath = entry.second.second;
+        if (prefixPath.path.empty() && suffixPath.path.empty()) continue;
+        const uint16_t total = prefixPath.makespan + suffixPath.makespan;
+        if (!best || total < bestTotal) {
+            best = &entry.second;
+            bestState = entry.first;
+            bestTotal = total;
+        }
+    }
+    if (!best) {
+        std::cerr << "visualizeOptimalPath: no plan to draw - run() found nothing" << std::endl;
+        return;
+    }
+
+    const std::string dotFile = filename + ".dot";
+    const std::string pngFile = filename + ".png";
+    std::ofstream file(dotFile);
+    if (!file.is_open()) {
+        std::cerr << "visualizeOptimalPath: could not open " << dotFile << std::endl;
+        return;
+    }
+
+    const TaskAllocPath& prefix = best->first;
+    const TaskAllocPath& suffix = best->second;
+
+    file << "digraph SamplerOptimalPath {\n";
+    file << "  rankdir=TB;\n";
+    file << "  node [fontname=Arial, style=filled];\n";
+    file << "  edge [fontname=Arial, fontsize=9];\n\n";
+
+    // ===== SUMMARY =====
+    std::ostringstream summary;
+    summary << "Random Sampling Plan\n";
+    summary << "Accepting state: q" << bestState << "\n";
+    summary << "Prefix: " << prefix.path.size() << " steps, " << prefix.makespan << "s\n";
+    if (!suffix.path.empty()) {
+        summary << "Suffix cycle: " << suffix.path.size() << " steps, "
+                << suffix.makespan << "s\n";
+    } else {
+        summary << "Suffix: none (finite run)\n";
+    }
+    summary << "Total makespan: " << bestTotal << "s\n";
+    summary << "Iterations: " << Iterations << "\n";
+    summary << "Search time: " << computationTime << "s";
+    file << "  summary [shape=note, label=\"" << escapeDotLabel(summary.str())
+         << "\", fillcolor=\"#FFFFCC\", penwidth=2];\n\n";
+
+    // ===== ROBOT TEAM =====
+    if (multiRobotSystem) {
+        file << "  subgraph cluster_robots {\n";
+        file << "    label=\"Robot Team & Capabilities\";\n";
+        file << "    style=filled;\n    fillcolor=\"#F0F8F0\";\n    color=black;\n\n";
+        // fillcolor rather than style=none: the graph default is style=filled, and Graphviz
+        // rejects "none" as a style with a warning
+        file << "    robot_caps [shape=plaintext, fillcolor=\"#F0F8F0\", label=<\n";
+        file << "      <TABLE BORDER=\"1\" CELLBORDER=\"1\" CELLSPACING=\"0\">\n";
+        file << "        <TR><TD COLSPAN=\"2\"><B>Robot Capabilities</B></TD></TR>\n";
+        for (const Robot* robot : multiRobotSystem->getRobots()) {
+            if (!robot) continue;
+            std::string caps;
+            const std::vector<bool>& flags = robot->getCapabilities();
+            for (size_t c = 0; c < flags.size(); ++c) {
+                if (!flags[c]) continue;
+                if (!caps.empty()) caps += ", ";
+                caps += capabilityToString(static_cast<RobotCapability>(c));
+            }
+            if (caps.empty()) caps = "None";
+            file << "        <TR><TD>R" << static_cast<unsigned>(robot->getRobotId())
+                 << "</TD><TD>" << caps << "</TD></TR>\n";
+        }
+        file << "      </TABLE>\n    >];\n  }\n\n";
+    }
+
+    // One node per step of either chain; returns the DOT id so the edges can refer to it
+    auto emitStep = [&](const std::string& tag, size_t index, const Random_Node* node,
+                        const char* fill) -> std::string {
+        const std::string id = tag + std::to_string(index);
+        std::ostringstream label;
+        label << (tag == "pre_" ? "Prefix " : "Suffix ") << index << "\n";
+        label << "NBA: q"
+              << (node->getautomatonState() ? node->getautomatonState()->getId() : 0)
+              << "  |  Makespan: " << node->getCurmakespan() << "s\n";
+
+        const std::vector<uint16_t>& aps = node->getTrueAPs();
+        const std::vector<std::vector<uint8_t>>& teams = node->getTaskAllocations();
+        if (aps.empty()) {
+            label << "-----\nNo proposition discharged\n(guard needs no robot)\n";
+        } else {
+            label << "-----\n";
+            for (size_t a = 0; a < aps.size(); ++a) {
+                const uint16_t region = (nba && nba->getLTLFormula())
+                    ? nba->getLTLFormula()->getBatchAP(aps[a]).getAP() : 0;
+                label << "p" << aps[a] << " @ region " << region << ": ";
+                if (a < teams.size() && !teams[a].empty()) {
+                    for (size_t r = 0; r < teams[a].size(); ++r) {
+                        if (r) label << ", ";
+                        label << "R" << static_cast<unsigned>(teams[a][r]);
+                    }
+                } else {
+                    label << "unstaffed";
+                }
+                label << "\n";
+            }
+        }
+        file << "  " << id << " [shape=box, label=\"" << escapeDotLabel(label.str())
+             << "\", fillcolor=\"" << fill << "\", penwidth=1.5];\n";
+        return id;
+    };
+
+    // ===== PREFIX =====
+    file << "  subgraph cluster_prefix {\n";
+    file << "    label=\"Prefix - run once, reaches q" << bestState << "\";\n";
+    file << "    style=filled;\n    fillcolor=\"#F4F8FF\";\n    color=\"#2a4d8f\";\n\n";
+    std::vector<std::string> prefixIds;
+    for (size_t i = 0; i < prefix.path.size(); ++i) {
+        if (!prefix.path[i]) continue;
+        const bool last = (i + 1 == prefix.path.size());
+        prefixIds.push_back(emitStep("pre_", i, prefix.path[i], last ? "#9ec5f4" : "#DCE9FB"));
+    }
+    file << "  }\n\n";
+
+    // ===== SUFFIX =====
+    std::vector<std::string> suffixIds;
+    if (!suffix.path.empty()) {
+        file << "  subgraph cluster_suffix {\n";
+        file << "    label=\"Suffix - repeated forever, " << suffix.makespan
+             << "s per cycle\";\n";
+        file << "    style=filled;\n    fillcolor=\"#FFF6F0\";\n    color=\"#a6472e\";\n\n";
+        for (size_t i = 0; i < suffix.path.size(); ++i) {
+            if (!suffix.path[i]) continue;
+            suffixIds.push_back(emitStep("suf_", i, suffix.path[i], "#F7D9C4"));
+        }
+        file << "  }\n\n";
+    }
+
+    // ===== EDGES =====
+    for (size_t i = 0; i + 1 < prefixIds.size(); ++i) {
+        file << "  " << prefixIds[i] << " -> " << prefixIds[i + 1]
+             << " [penwidth=2, color=\"#2a4d8f\"];\n";
+    }
+    if (!prefixIds.empty() && !suffixIds.empty()) {
+        file << "  " << prefixIds.back() << " -> " << suffixIds.front()
+             << " [penwidth=2, color=\"#2a4d8f\", label=\"enter cycle\"];\n";
+    }
+    for (size_t i = 0; i + 1 < suffixIds.size(); ++i) {
+        file << "  " << suffixIds[i] << " -> " << suffixIds[i + 1]
+             << " [penwidth=2, color=\"#a6472e\"];\n";
+    }
+    if (!suffixIds.empty()) {
+        // The back edge is the point of a lasso: without it the drawing reads as a finite run.
+        // Routed out of and into the west side so it curves around the chain instead of landing
+        // on top of the forward edge, which is what happens on a two-step cycle.
+        file << "  " << suffixIds.back() << " -> " << suffixIds.front()
+             << " [penwidth=2.5, color=\"#a6472e\", style=dashed, constraint=false, "
+             << "tailport=w, headport=w, "
+             << "label=\"repeat (+" << suffix.makespan << "s)\"];\n";
+    }
+    if (!prefixIds.empty()) {
+        file << "\n  summary -> " << prefixIds.front() << " [style=dashed, color=gray];\n";
+    }
+
+    file << "}\n";
+    file.close();
+
+    const std::string command = "dot -Tpng \"" + dotFile + "\" -o \"" + pngFile + "\"";
+    if (system(command.c_str()) != 0) {
+        std::cerr << "visualizeOptimalPath: wrote " << dotFile
+                  << " but Graphviz 'dot' did not render a PNG" << std::endl;
+    }
 }

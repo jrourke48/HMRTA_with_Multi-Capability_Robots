@@ -35,6 +35,9 @@ class RandomSamplingTaskAllocation {
         uint16_t Iterations; // Number of iterations for random sampling
         double timeLimit; // Time limit for random sampling
         double computationTime; // Time taken for the computation
+        //Fewest states between two automaton states, keyed by (source, goal). The automaton being
+        //searched does not change between samples, so each pair is only ever computed once
+        std::map<std::pair<uint16_t, uint16_t>, uint16_t> minDistanceCache;
         std::vector<Point> initialPositions; // Robot placements when planning began, snapshotted
                                              // once so sampling never reads the team's live state
 
@@ -59,6 +62,10 @@ class RandomSamplingTaskAllocation {
         //Uses DFS to get minimum length path to Goal This needs work
         TaskAllocPath getMinLengthPath(Node* srcNode, Node* goalNode);
 
+        //Fewest states on any route from srcNode to goalNode, or 0 when the goal cannot be
+        //reached. This is what the path builders actually need, and the result is cached
+        uint16_t minDistance(Node* srcNode, Node* goalNode);
+
         //Incrementally build a random path (or cycle if srcNode == goalNode) of at most targetLength nodes
         //returns an empty path if the goal is not reached or the makespan exceeds makespanBound
         //startTimes and startPositions carry the robot clocks and placements the path continues from,
@@ -74,6 +81,12 @@ class RandomSamplingTaskAllocation {
                        const std::vector<std::vector<uint8_t>>& teams,
                        std::vector<uint16_t>& times,
                        std::vector<Point>& positions) const;
+
+        //Render the cheapest plan found as Graphviz DOT, and a PNG beside it if dot is installed.
+        //The plan is a lasso, so the prefix and the repeating suffix are drawn as separate chains
+        //with a back edge closing the cycle; a finite automaton has no suffix and is drawn as a
+        //straight chain. Call after run(); does nothing when no plan was found.
+        void visualizeOptimalPath(const std::string& filename) const;
 
 
         //========================

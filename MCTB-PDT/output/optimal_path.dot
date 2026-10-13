@@ -54,15 +54,16 @@ digraph ComprehensiveOptimalPath {
     fillcolor="#F8F0F0";
     color=black;
 
-    ltl_info [shape=box, label="LTL Formula Details:\nAutomaton States: 4\nAccepting States: 1\n", fillcolor="#F8E8E8"];
+    ltl_info [shape=box, label="LTL Formula Details:\nAutomaton States: 5\nAccepting States: 1\n\n--- LTL FORMULA ---\nGFp1 & GFp2 & GFp3 & GFp4", fillcolor="#F8E8E8"];
 
     ltl_tasks [shape=plaintext, label=<
       <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0">
-        <TR><TD COLSPAN="3"><B>Task Requirements (LTL APs)</B></TD></TR>
-        <TR><TD><B>AP ID</B></TD><TD><B>Batch Value</B></TD><TD><B>Required Capabilities</B></TD></TR>
-        <TR><TD>AP1</TD><TD>0 (Unrelated)</TD><TD>Movement_Ground, Sensor_GPS</TD></TR>
-        <TR><TD>AP2</TD><TD>0 (Unrelated)</TD><TD>Movement_Ground, Sensor_GPS</TD></TR>
-        <TR><TD>AP3</TD><TD>0 (Unrelated)</TD><TD>Movement_Ground, Sensor_GPS</TD></TR>
+        <TR><TD COLSPAN="5"><B>Task Requirements (LTL APs)</B></TD></TR>
+        <TR><TD><B>AP ID</B></TD><TD><B>TS Region</B></TD><TD><B>Batch Value</B></TD><TD><B>Type</B></TD><TD><B>Required Capabilities</B></TD></TR>
+        <TR><TD>AP1</TD><TD>TS1</TD><TD>0</TD><TD>Unrelated</TD><TD>Movement_Ground, Sensor_GPS</TD></TR>
+        <TR><TD>AP2</TD><TD>TS2</TD><TD>1</TD><TD>Compatible</TD><TD>Sensor_GPS</TD></TR>
+        <TR><TD>AP3</TD><TD>TS3</TD><TD>-1</TD><TD>Exclusive</TD><TD>Movement_Ground, Sensor_Camera, Sensor_GPS</TD></TR>
+        <TR><TD>AP4</TD><TD>TS4</TD><TD>0</TD><TD>Unrelated</TD><TD>Movement_Ground, Sensor_Camera</TD></TR>
       </TABLE>
     >];
   }
@@ -74,24 +75,28 @@ digraph ComprehensiveOptimalPath {
     color=darkred;
     penwidth=2;
 
-    path_summary [shape=note, label="Optimal Path Summary\nTotal Steps: 8\nFinal Cost: 35\nTotal Execution Time: 128s\n", fillcolor="#FFFFCC", penwidth=2];
+    path_summary [shape=note, label="Optimal Path Summary\nTotal Steps: 10\nFinal Cost: 41\nTotal Execution Time: 204s\n", fillcolor="#FFFFCC", penwidth=2];
 
     opt_0 [shape=box, label="Step 0\nNBA: 0 | TS: 0\nCost: 0s | Total: 0s\n-----\nAllocated Robots:\n", fillcolor="#B3E5FC", penwidth=1.5];
-    opt_1 [shape=box, label="Step 1\nNBA: 2 | TS: 3\nCost: 18s | Total: 35s\n-----\nAllocated Robots:\n  R0: 18s\n  R1: 17s\n", fillcolor="#B3E5FC", penwidth=1.5];
-    opt_2 [shape=box, label="Step 2\nNBA: 3 | TS: 2\nCost: 18s | Total: 52s\n-----\nAllocated Robots:\n  R3: 8s\n  R4: 9s\n", fillcolor="#B3E5FC", penwidth=1.5];
-    opt_3 [shape=box, label="Step 3\nNBA: 0 | TS: 1\nCost: 18s | Total: 68s\n-----\nAllocated Robots:\n  R3: 16s\n  R4: 17s\n", fillcolor="#B3E5FC", penwidth=1.5];
-    opt_4 [shape=box, label="Step 4\nNBA: 2 | TS: 3\nCost: 19s | Total: 70s\n-----\nAllocated Robots:\n  R0: 19s\n  R1: 18s\n", fillcolor="#B3E5FC", penwidth=1.5];
-    opt_5 [shape=box, label="Step 5\nNBA: 3 | TS: 2\nCost: 27s | Total: 88s\n-----\nAllocated Robots:\n  R1: 27s\n  R3: 25s\n", fillcolor="#B3E5FC", penwidth=1.5];
-    opt_6 [shape=box, label="Step 6\nNBA: 0 | TS: 1\nCost: 33s | Total: 103s\n-----\nAllocated Robots:\n  R0: 33s\n  R4: 18s\n", fillcolor="#B3E5FC", penwidth=1.5];
-    opt_7 [shape=box, label="Step 7\nNBA: 2 | TS: 3\nCost: 35s | Total: 128s\n-----\nAllocated Robots:\n  R3: 35s\n  R4: 33s\n", fillcolor="#FF6B6B", penwidth=3, color=darkred, fontweight=bold, fontsize=11];
+    opt_1 [shape=box, label="Step 1\nNBA: 2 | TS: 4\nCost: 14s | Total: 28s\n-----\nAllocated Robots:\n  R1: 14s\n  R5: 14s\n", fillcolor="#B3E5FC", penwidth=1.5];
+    opt_2 [shape=box, label="Step 2\nNBA: 3 | TS: 3\nCost: 19s | Total: 85s\n-----\nAllocated Robots:\n  R0: 19s\n  R2: 19s\n  R4: 19s\n", fillcolor="#B3E5FC", penwidth=1.5];
+    opt_3 [shape=box, label="Step 3\nNBA: 4 | TS: 2\nCost: 19s | Total: 93s\n-----\nAllocated Robots:\n  R3: 8s\n", fillcolor="#B3E5FC", penwidth=1.5];
+    opt_4 [shape=box, label="Step 4\nNBA: 0 | TS: 1\nCost: 28s | Total: 127s\n-----\nAllocated Robots:\n  R1: 28s\n  R3: 28s\n", fillcolor="#B3E5FC", penwidth=1.5];
+    opt_5 [shape=box, label="Step 5\nNBA: 2 | TS: 4\nCost: 28s | Total: 144s\n-----\nAllocated Robots:\n  R4: 25s\n  R5: 25s\n", fillcolor="#B3E5FC", penwidth=1.5];
+    opt_6 [shape=box, label="Step 6\nNBA: 3 | TS: 3\nCost: 31s | Total: 174s\n-----\nAllocated Robots:\n  R0: 31s\n  R2: 31s\n  R4: 31s\n", fillcolor="#B3E5FC", penwidth=1.5];
+    opt_7 [shape=box, label="Step 7\nNBA: 4 | TS: 2\nCost: 41s | Total: 184s\n-----\nAllocated Robots:\n  R0: 41s\n", fillcolor="#B3E5FC", penwidth=1.5];
+    opt_8 [shape=box, label="Step 8\nNBA: 0 | TS: 1\nCost: 41s | Total: 186s\n-----\nAllocated Robots:\n  R1: 29s\n  R3: 29s\n", fillcolor="#B3E5FC", penwidth=1.5];
+    opt_9 [shape=box, label="Step 9\nNBA: 2 | TS: 4\nCost: 41s | Total: 204s\n-----\nAllocated Robots:\n  R4: 37s\n  R5: 37s\n", fillcolor="#FF6B6B", penwidth=3, color=darkred, fontweight=bold, fontsize=11];
 
-    opt_0 -> opt_1 [label="Δ=18s", penwidth=2, color=darkred];
-    opt_1 -> opt_2 [label="Δ=0s", penwidth=2, color=darkred];
+    opt_0 -> opt_1 [label="Δ=14s", penwidth=2, color=darkred];
+    opt_1 -> opt_2 [label="Δ=5s", penwidth=2, color=darkred];
     opt_2 -> opt_3 [label="Δ=0s", penwidth=2, color=darkred];
-    opt_3 -> opt_4 [label="Δ=1s", penwidth=2, color=darkred];
-    opt_4 -> opt_5 [label="Δ=8s", penwidth=2, color=darkred];
-    opt_5 -> opt_6 [label="Δ=6s", penwidth=2, color=darkred];
-    opt_6 -> opt_7 [label="Δ=2s", penwidth=2, color=darkred];
+    opt_3 -> opt_4 [label="Δ=9s", penwidth=2, color=darkred];
+    opt_4 -> opt_5 [label="Δ=0s", penwidth=2, color=darkred];
+    opt_5 -> opt_6 [label="Δ=3s", penwidth=2, color=darkred];
+    opt_6 -> opt_7 [label="Δ=10s", penwidth=2, color=darkred];
+    opt_7 -> opt_8 [label="Δ=0s", penwidth=2, color=darkred];
+    opt_8 -> opt_9 [label="Δ=0s", penwidth=2, color=darkred];
   }
 
   // Connections between clusters

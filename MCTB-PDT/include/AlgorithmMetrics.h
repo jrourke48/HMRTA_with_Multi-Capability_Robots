@@ -58,6 +58,16 @@ public:
         long long full_product_automaton_nodes = 0;
         long long full_product_automaton_edges = 0;
         double full_product_automaton_memory_MB= 0;
+        //
+        uint32_t random_sampling_iterations = 0;
+        double random_sampling_memory_MB = 0.0;
+        // Which budget multiple of the tree's runtime the sampler was given on this row
+        double random_sampling_budget_multiplier = 0.0;
+        // Spread across repeat trials. Averaging collapses the trials, so without these the
+        // sampler's run-to-run variation would be unrecoverable
+        double tree_computation_time_stddev_ms = 0.0;
+        double random_sampling_computation_time_stddev = 0.0;
+
         
         // Derived efficiency metrics
         double pruning_ratio = 0.0;                      // pruned / total_generated
@@ -76,6 +86,8 @@ public:
         // Time-based metrics
         double tree_makespan_seconds = 0.0;                   // Total mission completion time
         double product_makespan_seconds = 0.0;           // Total mission completion time for the full product automaton
+        double random_sampling_makespan_seconds = 0.0;    // Total mission completion time for the random sampling approach
+        double random_sampling_makespan_stddev = 0.0;     // Spread of that makespan across repeat trials
         double sum_of_travel_times_seconds = 0.0;        // Total team effort
         double total_travel_distance = 0.0;
         double max_individual_travel_distance = 0.0;
@@ -102,11 +114,21 @@ public:
     void setIndependentVariables(const IndependentVariables& vars);
     void setTaskMemoryUsageMB(double MB);
     void setFullProductAutomatonMetrics(long long nodes, long long edges, double makespan_seconds, double computation_time_ms, double MB);
+    void setRandomSamplingMetrics(uint32_t iterations, double makespan_seconds, double computation_time_seconds, double MB);
     void startTimer();
     void stopTimer();
     
     // Compute derived metrics
     void computeDerivedMetrics();
+
+    // Average a set of trials field by field. Deterministic fields are unaffected because the
+    // mean of identical values is that value, so there is no list of "fields that vary" to
+    // keep in step with new metrics. Derived fields are recomputed afterwards rather than
+    // averaged, since the mean of a set of ratios is not the ratio of the means.
+    static AlgorithmMetrics mean(const std::vector<AlgorithmMetrics>& trials);
+
+    // Population standard deviation of one sampled quantity across trials
+    static double stddev(const std::vector<double>& values);
     
     // Data access
     const IndependentVariables& getIndependentVariables() const { return iv_; }
@@ -142,6 +164,7 @@ public:
      // Primary timing measurements
     double total_computation_time_ms = 0.0;          // milliseconds
     double product_computation_time_ms = 0.0; // milliseconds
+    double random_sampling_computation_time_seconds = 0.0;    // computation time for the random sampling approach
     IndependentVariables iv_;
     SubtreeEfficiencyMetrics subtree_efficiency_;
     SolutionQualityMetrics solution_quality_;

@@ -6,6 +6,12 @@ Supports 4 robot configurations: 3, 6, 15, and 45 robots
 """
 
 import matplotlib.pyplot as plt
+# Shared thesis styling: Times New Roman, print palette, titles suppressed in favour of captions
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+import thesis_style as _thesis_style
+_thesis_style.apply()
 import os
 import glob
 import csv
@@ -58,7 +64,9 @@ for csv_file in sorted(csv_files):
                 'automaton_states': int(row['num_automaton_states']),
                 'total_computation_time_ms': float(row['total_computation_time_ms']),
                 'makespan': float(row['tree_makespan_seconds']) if 'tree_makespan_seconds' in row and row['tree_makespan_seconds'] else 0,
-                'product_makespan': float(row['product_makespan_seconds']) if 'product_makespan_seconds' in row and row['product_makespan_seconds'] else 0
+                'product_makespan': float(row['product_makespan_seconds']) if 'product_makespan_seconds' in row and row['product_makespan_seconds'] else 0,
+                'sampling_makespan': float(row['random_sampling_makespan_seconds'])
+                                     if row.get('random_sampling_makespan_seconds') else 0
             }
             
             # Store in appropriate dict
@@ -81,38 +89,42 @@ times_3robots = [data_3robots[aid]["total_computation_time_ms"] for aid in autom
 states_3robots = [data_3robots[aid]["automaton_states"] for aid in automaton_ids_3]
 makespans_3robots = [data_3robots[aid]["makespan"] for aid in automaton_ids_3]
 product_makespans_3robots = [data_3robots[aid]["product_makespan"] for aid in automaton_ids_3]
+sampling_makespans_3robots = [data_3robots[aid]["sampling_makespan"] for aid in automaton_ids_3]
 
 times_6robots = [data_6robots[aid]["total_computation_time_ms"] for aid in automaton_ids_6]
 states_6robots = [data_6robots[aid]["automaton_states"] for aid in automaton_ids_6]
 makespans_6robots = [data_6robots[aid]["makespan"] for aid in automaton_ids_6]
 product_makespans_6robots = [data_6robots[aid]["product_makespan"] for aid in automaton_ids_6]
+sampling_makespans_6robots = [data_6robots[aid]["sampling_makespan"] for aid in automaton_ids_6]
 
 times_15robots = [data_15robots[aid]["total_computation_time_ms"] for aid in automaton_ids_15]
 states_15robots = [data_15robots[aid]["automaton_states"] for aid in automaton_ids_15]
 makespans_15robots = [data_15robots[aid]["makespan"] for aid in automaton_ids_15]
 product_makespans_15robots = [data_15robots[aid]["product_makespan"] for aid in automaton_ids_15]
+sampling_makespans_15robots = [data_15robots[aid]["sampling_makespan"] for aid in automaton_ids_15]
 
 times_45robots = [data_45robots[aid]["total_computation_time_ms"] for aid in automaton_ids_45]
 states_45robots = [data_45robots[aid]["automaton_states"] for aid in automaton_ids_45]
 makespans_45robots = [data_45robots[aid]["makespan"] for aid in automaton_ids_45]
 product_makespans_45robots = [data_45robots[aid]["product_makespan"] for aid in automaton_ids_45]
+sampling_makespans_45robots = [data_45robots[aid]["sampling_makespan"] for aid in automaton_ids_45]
 
 # Create separate figures for each robot count
 # ============================================================================
 # FIGURE 1: 3-Robot Environment
 # ============================================================================
 fig1, ax1 = plt.subplots(figsize=(10, 6))
-fig1.suptitle('Automaton Complexity vs Computation Time (3-Robot Team)', fontsize=16, fontweight='bold')
+fig1.suptitle('Automaton Complexity vs Computation Time (3-Robot Team)', fontsize=16)
 
 ax1.plot(states_3robots, times_3robots, marker='o', markersize=8, 
-         linewidth=2.5, color='#1f77b4', label='3-Robot Team')
-ax1.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
-ax1.set_ylabel('Computation Time (ms)', fontsize=12, fontweight='bold')
+         linewidth=2.5, color='#0072B2', label='3-Robot Team')
+ax1.set_xlabel('Number of Automaton States', fontsize=12)
+ax1.set_ylabel('Computation Time (ms)', fontsize=12)
 ax1.grid(True, alpha=0.3)
 
 # Add value labels on points
 for i, (s, t) in enumerate(zip(states_3robots, times_3robots)):
-    ax1.text(s, t, f'{t:.2f}ms', ha='center', va='bottom', fontweight='bold')
+    ax1.text(s, t, f'{t:.2f}ms', ha='center', va='bottom')
 
 plt.tight_layout()
 plt.savefig('Plots/automaton_computation_time_3robots.png', dpi=300, bbox_inches='tight')
@@ -123,17 +135,17 @@ plt.close(fig1)
 # FIGURE 2: 6-Robot Environment
 # ============================================================================
 fig2, ax2 = plt.subplots(figsize=(10, 6))
-fig2.suptitle('Automaton Complexity vs Computation Time (6-Robot Team)', fontsize=16, fontweight='bold')
+fig2.suptitle('Automaton Complexity vs Computation Time (6-Robot Team)', fontsize=16)
 
 ax2.plot(states_6robots, times_6robots, marker='s', markersize=8, 
-         linewidth=2.5, color='#ff7f0e', label='6-Robot Team')
-ax2.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
-ax2.set_ylabel('Computation Time (ms)', fontsize=12, fontweight='bold')
+         linewidth=2.5, color='#D55E00', label='6-Robot Team')
+ax2.set_xlabel('Number of Automaton States', fontsize=12)
+ax2.set_ylabel('Computation Time (ms)', fontsize=12)
 ax2.grid(True, alpha=0.3)
 
 # Add value labels on points
 for i, (s, t) in enumerate(zip(states_6robots, times_6robots)):
-    ax2.text(s, t, f'{t:.2f}ms', ha='center', va='bottom', fontweight='bold')
+    ax2.text(s, t, f'{t:.2f}ms', ha='center', va='bottom')
 
 plt.tight_layout()
 plt.savefig('Plots/automaton_computation_time_6robots.png', dpi=300, bbox_inches='tight')
@@ -144,17 +156,17 @@ plt.close(fig2)
 # FIGURE 3: 15-Robot Environment
 # ============================================================================
 fig3, ax3 = plt.subplots(figsize=(10, 6))
-fig3.suptitle('Automaton Complexity vs Computation Time (15-Robot Team)', fontsize=16, fontweight='bold')
+fig3.suptitle('Automaton Complexity vs Computation Time (15-Robot Team)', fontsize=16)
 
 ax3.plot(states_15robots, times_15robots, marker='^', markersize=8, 
-         linewidth=2.5, color='#2ca02c', label='15-Robot Team')
-ax3.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
-ax3.set_ylabel('Computation Time (ms)', fontsize=12, fontweight='bold')
+         linewidth=2.5, color='#009E73', label='15-Robot Team')
+ax3.set_xlabel('Number of Automaton States', fontsize=12)
+ax3.set_ylabel('Computation Time (ms)', fontsize=12)
 ax3.grid(True, alpha=0.3)
 
 # Add value labels on points
 for i, (s, t) in enumerate(zip(states_15robots, times_15robots)):
-    ax3.text(s, t, f'{t:.2f}ms', ha='center', va='bottom', fontweight='bold')
+    ax3.text(s, t, f'{t:.2f}ms', ha='center', va='bottom')
 
 plt.tight_layout()
 plt.savefig('Plots/automaton_computation_time_15robots.png', dpi=300, bbox_inches='tight')
@@ -165,17 +177,17 @@ plt.close(fig3)
 # FIGURE 4: 45-Robot Environment
 # ============================================================================
 fig4, ax4 = plt.subplots(figsize=(10, 6))
-fig4.suptitle('Automaton Complexity vs Computation Time (45-Robot Team)', fontsize=16, fontweight='bold')
+fig4.suptitle('Automaton Complexity vs Computation Time (45-Robot Team)', fontsize=16)
 
 ax4.plot(states_45robots, times_45robots, marker='D', markersize=8, 
-         linewidth=2.5, color='#d62728', label='45-Robot Team')
-ax4.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
-ax4.set_ylabel('Computation Time (ms)', fontsize=12, fontweight='bold')
+         linewidth=2.5, color='#CC79A7', label='45-Robot Team')
+ax4.set_xlabel('Number of Automaton States', fontsize=12)
+ax4.set_ylabel('Computation Time (ms)', fontsize=12)
 ax4.grid(True, alpha=0.3)
 
 # Add value labels on points
 for i, (s, t) in enumerate(zip(states_45robots, times_45robots)):
-    ax4.text(s, t, f'{t:.2f}ms', ha='center', va='bottom', fontweight='bold')
+    ax4.text(s, t, f'{t:.2f}ms', ha='center', va='bottom')
 
 plt.tight_layout()
 plt.savefig('Plots/automaton_computation_time_45robots.png', dpi=300, bbox_inches='tight')
@@ -187,25 +199,31 @@ plt.close(fig4)
 # ============================================================================
 if any(makespans_3robots):
     fig5, ax5 = plt.subplots(figsize=(10, 6))
-    fig5.suptitle('Automaton Complexity vs Makespan (3-Robot Team)', fontsize=16, fontweight='bold')
+    fig5.suptitle('Automaton Complexity vs Makespan (3-Robot Team)', fontsize=16)
 
     ax5.plot(states_3robots, makespans_3robots, marker='o', markersize=8, 
-             linewidth=2.5, color='#1f77b4', label='Tree Makespan (Task Allocation)')
+             linewidth=2.5, color='#0072B2', label='Tree Makespan (Task Allocation)')
     
     # Add product makespan overlay if non-zero values exist (only if within 2x tree makespan)
     filtered_product_makespans_3 = filter_product_makespans(product_makespans_3robots, makespans_3robots)
     if any(pm > 0 for pm in filtered_product_makespans_3):
         ax5.plot(states_3robots, filtered_product_makespans_3, marker='s', markersize=8, 
-                 linewidth=2.5, color='#d62728', linestyle='--', label='Product Automaton Makespan')
+                 linewidth=2.5, color='#CC79A7', linestyle='--', label='Product Automaton Makespan')
     
-    ax5.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
-    ax5.set_ylabel('Makespan (seconds)', fontsize=12, fontweight='bold')
+
+    # Sampler runs on every instance, so it is plotted unfiltered wherever it found a plan
+    if any(sm > 0 for sm in sampling_makespans_3robots):
+        ax5.plot(states_3robots, [sm if sm > 0 else None for sm in sampling_makespans_3robots],
+                 marker='^', markersize=8, linewidth=2.5, color='#009E73', linestyle=':',
+                 label='Random Sampling Makespan')
+    ax5.set_xlabel('Number of Automaton States', fontsize=12)
+    ax5.set_ylabel('Makespan (seconds)', fontsize=12)
     ax5.grid(True, alpha=0.3)
     ax5.legend(fontsize=11, loc='best')
 
     # Add value labels on points
     for i, (s, m) in enumerate(zip(states_3robots, makespans_3robots)):
-        ax5.text(s, m, f'{m:.2f}s', ha='center', va='bottom', fontweight='bold', fontsize=9)
+        ax5.text(s, m, f'{m:.2f}s', ha='center', va='bottom', fontsize=9)
 
     plt.tight_layout()
     plt.savefig('Plots/automaton_makespan_3robots.png', dpi=300, bbox_inches='tight')
@@ -217,25 +235,31 @@ if any(makespans_3robots):
 # ============================================================================
 if any(makespans_6robots):
     fig6, ax6 = plt.subplots(figsize=(10, 6))
-    fig6.suptitle('Automaton Complexity vs Makespan (6-Robot Team)', fontsize=16, fontweight='bold')
+    fig6.suptitle('Automaton Complexity vs Makespan (6-Robot Team)', fontsize=16)
 
     ax6.plot(states_6robots, makespans_6robots, marker='s', markersize=8, 
-             linewidth=2.5, color='#ff7f0e', label='Tree Makespan (Task Allocation)')
+             linewidth=2.5, color='#D55E00', label='Tree Makespan (Task Allocation)')
     
     # Add product makespan overlay if non-zero values exist (only if within 2x tree makespan)
     filtered_product_makespans_6 = filter_product_makespans(product_makespans_6robots, makespans_6robots)
     if any(pm > 0 for pm in filtered_product_makespans_6):
         ax6.plot(states_6robots, filtered_product_makespans_6, marker='^', markersize=8, 
-                 linewidth=2.5, color='#d62728', linestyle='--', label='Product Automaton Makespan')
+                 linewidth=2.5, color='#CC79A7', linestyle='--', label='Product Automaton Makespan')
     
-    ax6.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
-    ax6.set_ylabel('Makespan (seconds)', fontsize=12, fontweight='bold')
+
+    # Sampler runs on every instance, so it is plotted unfiltered wherever it found a plan
+    if any(sm > 0 for sm in sampling_makespans_6robots):
+        ax6.plot(states_6robots, [sm if sm > 0 else None for sm in sampling_makespans_6robots],
+                 marker='^', markersize=8, linewidth=2.5, color='#009E73', linestyle=':',
+                 label='Random Sampling Makespan')
+    ax6.set_xlabel('Number of Automaton States', fontsize=12)
+    ax6.set_ylabel('Makespan (seconds)', fontsize=12)
     ax6.grid(True, alpha=0.3)
     ax6.legend(fontsize=11, loc='best')
 
     # Add value labels on points
     for i, (s, m) in enumerate(zip(states_6robots, makespans_6robots)):
-        ax6.text(s, m, f'{m:.2f}s', ha='center', va='bottom', fontweight='bold', fontsize=9)
+        ax6.text(s, m, f'{m:.2f}s', ha='center', va='bottom', fontsize=9)
 
     plt.tight_layout()
     plt.savefig('Plots/automaton_makespan_6robots.png', dpi=300, bbox_inches='tight')
@@ -247,25 +271,31 @@ if any(makespans_6robots):
 # ============================================================================
 if any(makespans_15robots):
     fig7, ax7 = plt.subplots(figsize=(10, 6))
-    fig7.suptitle('Automaton Complexity vs Makespan (15-Robot Team)', fontsize=16, fontweight='bold')
+    fig7.suptitle('Automaton Complexity vs Makespan (15-Robot Team)', fontsize=16)
 
     ax7.plot(states_15robots, makespans_15robots, marker='^', markersize=8, 
-             linewidth=2.5, color='#2ca02c', label='Tree Makespan (Task Allocation)')
+             linewidth=2.5, color='#009E73', label='Tree Makespan (Task Allocation)')
     
     # Add product makespan overlay if non-zero values exist (only if within 2x tree makespan)
     filtered_product_makespans_15 = filter_product_makespans(product_makespans_15robots, makespans_15robots)
     if any(pm > 0 for pm in filtered_product_makespans_15):
         ax7.plot(states_15robots, filtered_product_makespans_15, marker='D', markersize=8, 
-                 linewidth=2.5, color='#d62728', linestyle='--', label='Product Automaton Makespan')
+                 linewidth=2.5, color='#CC79A7', linestyle='--', label='Product Automaton Makespan')
     
-    ax7.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
-    ax7.set_ylabel('Makespan (seconds)', fontsize=12, fontweight='bold')
+
+    # Sampler runs on every instance, so it is plotted unfiltered wherever it found a plan
+    if any(sm > 0 for sm in sampling_makespans_15robots):
+        ax7.plot(states_15robots, [sm if sm > 0 else None for sm in sampling_makespans_15robots],
+                 marker='^', markersize=8, linewidth=2.5, color='#009E73', linestyle=':',
+                 label='Random Sampling Makespan')
+    ax7.set_xlabel('Number of Automaton States', fontsize=12)
+    ax7.set_ylabel('Makespan (seconds)', fontsize=12)
     ax7.grid(True, alpha=0.3)
     ax7.legend(fontsize=11, loc='best')
 
     # Add value labels on points
     for i, (s, m) in enumerate(zip(states_15robots, makespans_15robots)):
-        ax7.text(s, m, f'{m:.2f}s', ha='center', va='bottom', fontweight='bold', fontsize=9)
+        ax7.text(s, m, f'{m:.2f}s', ha='center', va='bottom', fontsize=9)
 
     plt.tight_layout()
     plt.savefig('Plots/automaton_makespan_15robots.png', dpi=300, bbox_inches='tight')
@@ -277,25 +307,31 @@ if any(makespans_15robots):
 # ============================================================================
 if any(makespans_45robots):
     fig8, ax8 = plt.subplots(figsize=(10, 6))
-    fig8.suptitle('Automaton Complexity vs Makespan (45-Robot Team)', fontsize=16, fontweight='bold')
+    fig8.suptitle('Automaton Complexity vs Makespan (45-Robot Team)', fontsize=16)
 
     ax8.plot(states_45robots, makespans_45robots, marker='D', markersize=8, 
-             linewidth=2.5, color='#d62728', label='Tree Makespan (Task Allocation)')
+             linewidth=2.5, color='#CC79A7', label='Tree Makespan (Task Allocation)')
     
     # Add product makespan overlay if non-zero values exist (only if within 2x tree makespan)
     filtered_product_makespans_45 = filter_product_makespans(product_makespans_45robots, makespans_45robots)
     if any(pm > 0 for pm in filtered_product_makespans_45):
         ax8.plot(states_45robots, filtered_product_makespans_45, marker='*', markersize=12, 
-                 linewidth=2.5, color='#2ca02c', linestyle='--', label='Product Automaton Makespan')
+                 linewidth=2.5, color='#009E73', linestyle='--', label='Product Automaton Makespan')
     
-    ax8.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
-    ax8.set_ylabel('Makespan (seconds)', fontsize=12, fontweight='bold')
+
+    # Sampler runs on every instance, so it is plotted unfiltered wherever it found a plan
+    if any(sm > 0 for sm in sampling_makespans_45robots):
+        ax8.plot(states_45robots, [sm if sm > 0 else None for sm in sampling_makespans_45robots],
+                 marker='^', markersize=8, linewidth=2.5, color='#009E73', linestyle=':',
+                 label='Random Sampling Makespan')
+    ax8.set_xlabel('Number of Automaton States', fontsize=12)
+    ax8.set_ylabel('Makespan (seconds)', fontsize=12)
     ax8.grid(True, alpha=0.3)
     ax8.legend(fontsize=11, loc='best')
 
     # Add value labels on points
     for i, (s, m) in enumerate(zip(states_45robots, makespans_45robots)):
-        ax8.text(s, m, f'{m:.2f}s', ha='center', va='bottom', fontweight='bold', fontsize=9)
+        ax8.text(s, m, f'{m:.2f}s', ha='center', va='bottom', fontsize=9)
 
     plt.tight_layout()
     plt.savefig('Plots/automaton_makespan_45robots.png', dpi=300, bbox_inches='tight')
@@ -306,19 +342,19 @@ if any(makespans_45robots):
 # FIGURE 9: Comparison of All Robot Configurations - Computation Time
 # ============================================================================
 fig5, ax5 = plt.subplots(figsize=(12, 7))
-fig5.suptitle('Automaton Complexity vs Computation Time (All Configurations)', fontsize=16, fontweight='bold')
+fig5.suptitle('Automaton Complexity vs Computation Time (All Configurations)', fontsize=16)
 
 ax5.plot(states_3robots, times_3robots, marker='o', markersize=8, 
-         linewidth=2.5, color='#1f77b4', label='3-Robot Team')
+         linewidth=2.5, color='#0072B2', label='3-Robot Team')
 ax5.plot(states_6robots, times_6robots, marker='s', markersize=8, 
-         linewidth=2.5, color='#ff7f0e', label='6-Robot Team')
+         linewidth=2.5, color='#D55E00', label='6-Robot Team')
 ax5.plot(states_15robots, times_15robots, marker='^', markersize=8, 
-         linewidth=2.5, color='#2ca02c', label='15-Robot Team')
+         linewidth=2.5, color='#009E73', label='15-Robot Team')
 ax5.plot(states_45robots, times_45robots, marker='D', markersize=8, 
-         linewidth=2.5, color='#d62728', label='45-Robot Team')
+         linewidth=2.5, color='#CC79A7', label='45-Robot Team')
 
-ax5.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
-ax5.set_ylabel('Computation Time (ms)', fontsize=12, fontweight='bold')
+ax5.set_xlabel('Number of Automaton States', fontsize=12)
+ax5.set_ylabel('Computation Time (ms)', fontsize=12)
 ax5.legend(fontsize=11, loc='best')
 ax5.grid(True, alpha=0.3)
 
@@ -331,42 +367,54 @@ plt.close(fig5)
 # FIGURE 10: Comparison of All Robot Configurations - Makespan
 # ============================================================================
 fig10, ax10 = plt.subplots(figsize=(12, 7))
-fig10.suptitle('Automaton Complexity vs Makespan (All Configurations)', fontsize=16, fontweight='bold')
+fig10.suptitle('Automaton Complexity vs Makespan (All Configurations)', fontsize=16)
 
 if any(makespans_3robots):
     ax10.plot(states_3robots, makespans_3robots, marker='o', markersize=8, 
-             linewidth=2.5, color='#1f77b4', label='3-Robot (Task Allocation)')
+             linewidth=2.5, color='#0072B2', label='3-Robot (Task Allocation)')
 filtered_product_3_combined = filter_product_makespans(product_makespans_3robots, makespans_3robots)
 if any(pm > 0 for pm in filtered_product_3_combined):
     ax10.plot(states_3robots, filtered_product_3_combined, marker='o', markersize=6, 
-             linewidth=2.5, color='#1f77b4', linestyle='--', label='3-Robot (Product)')
+             linewidth=2.5, color='#0072B2', linestyle='--', label='3-Robot (Product)')
+if any(sm > 0 for sm in sampling_makespans_3robots):
+    ax10.plot(states_3robots, [sm if sm > 0 else None for sm in sampling_makespans_3robots], marker='^',
+             linewidth=2, color='#0072B2', linestyle=':', label='3-Robot (Sampler)')
     
 if any(makespans_6robots):
     ax10.plot(states_6robots, makespans_6robots, marker='s', markersize=8, 
-             linewidth=2.5, color='#ff7f0e', label='6-Robot (Task Allocation)')
+             linewidth=2.5, color='#D55E00', label='6-Robot (Task Allocation)')
 filtered_product_6_combined = filter_product_makespans(product_makespans_6robots, makespans_6robots)
 if any(pm > 0 for pm in filtered_product_6_combined):
     ax10.plot(states_6robots, filtered_product_6_combined, marker='s', markersize=6, 
-             linewidth=2.5, color='#ff7f0e', linestyle='--', label='6-Robot (Product)')
+             linewidth=2.5, color='#D55E00', linestyle='--', label='6-Robot (Product)')
+if any(sm > 0 for sm in sampling_makespans_6robots):
+    ax10.plot(states_6robots, [sm if sm > 0 else None for sm in sampling_makespans_6robots], marker='^',
+             linewidth=2, color='#D55E00', linestyle=':', label='6-Robot (Sampler)')
     
 if any(makespans_15robots):
     ax10.plot(states_15robots, makespans_15robots, marker='^', markersize=8, 
-             linewidth=2.5, color='#2ca02c', label='15-Robot (Task Allocation)')
+             linewidth=2.5, color='#009E73', label='15-Robot (Task Allocation)')
 filtered_product_15_combined = filter_product_makespans(product_makespans_15robots, makespans_15robots)
 if any(pm > 0 for pm in filtered_product_15_combined):
     ax10.plot(states_15robots, filtered_product_15_combined, marker='^', markersize=6, 
-             linewidth=2.5, color='#2ca02c', linestyle='--', label='15-Robot (Product)')
+             linewidth=2.5, color='#009E73', linestyle='--', label='15-Robot (Product)')
+if any(sm > 0 for sm in sampling_makespans_15robots):
+    ax10.plot(states_15robots, [sm if sm > 0 else None for sm in sampling_makespans_15robots], marker='D',
+             linewidth=2, color='#009E73', linestyle=':', label='15-Robot (Sampler)')
     
 if any(makespans_45robots):
     ax10.plot(states_45robots, makespans_45robots, marker='D', markersize=8, 
-             linewidth=2.5, color='#d62728', label='45-Robot (Task Allocation)')
+             linewidth=2.5, color='#CC79A7', label='45-Robot (Task Allocation)')
 filtered_product_45_combined = filter_product_makespans(product_makespans_45robots, makespans_45robots)
 if any(pm > 0 for pm in filtered_product_45_combined):
     ax10.plot(states_45robots, filtered_product_45_combined, marker='D', markersize=6, 
-             linewidth=2.5, color='#d62728', linestyle='--', label='45-Robot (Product)')
+             linewidth=2.5, color='#CC79A7', linestyle='--', label='45-Robot (Product)')
+if any(sm > 0 for sm in sampling_makespans_45robots):
+    ax10.plot(states_45robots, [sm if sm > 0 else None for sm in sampling_makespans_45robots], marker='^',
+             linewidth=2, color='#CC79A7', linestyle=':', label='45-Robot (Sampler)')
 
-ax10.set_xlabel('Number of Automaton States', fontsize=12, fontweight='bold')
-ax10.set_ylabel('Makespan (seconds)', fontsize=12, fontweight='bold')
+ax10.set_xlabel('Number of Automaton States', fontsize=12)
+ax10.set_ylabel('Makespan (seconds)', fontsize=12)
 ax10.legend(fontsize=10, loc='best')
 ax10.grid(True, alpha=0.3)
 

@@ -3,20 +3,24 @@ digraph PlanningTree {
   node [shape=box, style=filled, fontname=Arial, fontsize=10];
   edge [fontname=Arial, fontsize=9];
 
-  node_0 [label="Node 0\nNBA: 0, TS: 1\nProgress: SUF\nMax Time: 33\nBatch: 0\nRobots: [1,0,0,0,1,0]", fillcolor="#E6F3FF"];
-  node_1 [label="Node 1\nNBA: 3, TS: 2\nProgress: TRA\nMax Time: 27\nBatch: 0\nRobots: [0,1,0,1,0,0]", fillcolor="#FFFFCC"];
-  node_2 [label="Node 2\nNBA: 2, TS: 3\nProgress: TRA\nMax Time: 19\nBatch: 0\nRobots: [1,1,0,0,0,0]", fillcolor="#FFFFCC"];
-  node_3 [label="Node 3\nNBA: 0, TS: 1\nProgress: TRA\nMax Time: 18\nBatch: 0\nRobots: [0,0,0,1,1,0]", fillcolor="#FFFFCC"];
-  node_4 [label="Node 4\nNBA: 3, TS: 2\nProgress: PRE\nMax Time: 18\nBatch: 0\nRobots: [0,0,0,1,1,0]", fillcolor="#FFE6E6"];
-  node_5 [label="Node 5\nNBA: 2, TS: 3\nProgress: PRE\nMax Time: 18\nBatch: 0\nRobots: [1,1,0,0,0,0]", fillcolor="#FFE6E6"];
-  node_6 [label="Node 6\nNBA: 0, TS: 0\nProgress: PRE\nMax Time: 0\nBatch: 0\nRobots: [0,0,0,0,0,0]", fillcolor="#FFE6E6"];
-  node_7 [label="Node 7\nNBA: 2, TS: 3\nProgress: OTH\nMax Time: 35\nBatch: 0\nRobots: [0,0,0,1,1,0]", fillcolor="#FF6B6B", penwidth=3, color=red];
+  node_0 [label="Node 0\nNBA: 0, TS: 0\nProgress: PRE\nMax Time: 0\nBatch: 0\nRobots: [0,0,0,0,0,0]", fillcolor="#FFE6E6"];
+  node_1 [label="Node 1\nNBA: 2, TS: 4\nProgress: PRE\nMax Time: 14\nBatch: 0\nRobots: [0,1,0,0,0,1]", fillcolor="#FFE6E6"];
+  node_2 [label="Node 2\nNBA: 3, TS: 3\nProgress: PRE\nMax Time: 19\nBatch: -1\nRobots: [1,0,1,0,1,0]", fillcolor="#FFE6E6"];
+  node_3 [label="Node 3\nNBA: 4, TS: 2\nProgress: PRE\nMax Time: 19\nBatch: 1\nRobots: [0,0,0,1,0,0]", fillcolor="#FFE6E6"];
+  node_4 [label="Node 4\nNBA: 0, TS: 1\nProgress: TRA\nMax Time: 28\nBatch: 0\nRobots: [0,1,0,1,0,0]", fillcolor="#FFFFCC"];
+  node_5 [label="Node 5\nNBA: 2, TS: 4\nProgress: TRA\nMax Time: 28\nBatch: 0\nRobots: [0,0,0,0,1,1]", fillcolor="#FFFFCC"];
+  node_6 [label="Node 6\nNBA: 3, TS: 3\nProgress: TRA\nMax Time: 31\nBatch: -1\nRobots: [1,0,1,0,1,0]", fillcolor="#FFFFCC"];
+  node_7 [label="Node 7\nNBA: 4, TS: 2\nProgress: TRA\nMax Time: 41\nBatch: 1\nRobots: [1,0,0,0,0,0]", fillcolor="#FFFFCC"];
+  node_8 [label="Node 8\nNBA: 0, TS: 1\nProgress: SUF\nMax Time: 41\nBatch: 0\nRobots: [0,1,0,1,0,0]", fillcolor="#E6F3FF"];
+  node_9 [label="Node 9\nNBA: 2, TS: 4\nProgress: OTH\nMax Time: 41\nBatch: 0\nRobots: [0,0,0,0,1,1]", fillcolor="#FF6B6B", penwidth=3, color=red];
 
-  node_0 -> node_7 [label="cost=35"];
-  node_1 -> node_0 [label="cost=33"];
-  node_2 -> node_1 [label="cost=27"];
-  node_3 -> node_2 [label="cost=19"];
-  node_4 -> node_3 [label="cost=18"];
-  node_5 -> node_4 [label="cost=18"];
-  node_6 -> node_5 [label="cost=18"];
+  node_0 -> node_1 [label="cost=14"];
+  node_1 -> node_2 [label="cost=19"];
+  node_2 -> node_3 [label="cost=19"];
+  node_3 -> node_4 [label="cost=28"];
+  node_4 -> node_5 [label="cost=28"];
+  node_5 -> node_6 [label="cost=31"];
+  node_6 -> node_7 [label="cost=41"];
+  node_7 -> node_8 [label="cost=41"];
+  node_8 -> node_9 [label="cost=41"];
 }

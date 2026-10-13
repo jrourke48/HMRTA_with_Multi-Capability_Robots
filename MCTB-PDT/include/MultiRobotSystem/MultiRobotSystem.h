@@ -47,6 +47,11 @@ public:
     std::vector<Point> getRobotPositions() const;
     void setRobotPositions(const std::vector<Point>& positions);
 
+    // Return every robot to the position it was created at. Planning mutates these positions as
+    // it explores, so a planner that reuses a robot system must reset it or it will start from
+    // wherever the previous run happened to leave the team.
+    void resetRobotPositions();
+
     //getemptyV vector
     std::vector<bool> getEmptyV() const;
     

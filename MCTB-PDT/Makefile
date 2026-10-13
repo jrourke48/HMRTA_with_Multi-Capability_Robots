@@ -1,13 +1,17 @@
 # Makefile for Planning Tree Integration Tests
 # Compiler and flags
 CXX = g++
-CXXFLAGS = -std=c++20 -Wall -Wextra -g3
+CXXFLAGS = -std=c++20 -Wall -Wextra -g3 -MMD -MP
 INCLUDES = -I. -I./include -I./src -I..
 LIBS = -lspot -lbddx
 RAYLIB_FLAGS = $(shell pkg-config --cflags --libs raylib 2>/dev/null || echo "-lraylib -lGL -lm -lpthread -ldl -lrt -lX11")
 
 # Output directory
 OUT_DIR = Testing
+# Trials to repeat each sampler budget in the budget study.
+# BUDGET_APPEND=--append adds to the existing CSVs instead of replacing them.
+BUDGET_TRIALS ?= 1
+BUDGET_APPEND ?=
 OUT_BIN = $(OUT_DIR)/TestIntegration
 TREE_BIN = $(OUT_DIR)/TreeBuildingTests
 TASK_ALLOC_BIN = $(OUT_DIR)/TestTaskAllocation
@@ -48,6 +52,31 @@ GRIDVIS_SRC = src/Environment/gridvis.cpp
 TASK_ALLOC_SRCS = src/TaskAllocationAlgorithms.cpp
 # RandomSamplingTaskAllocation - random sampling algorithm implementation
 SAMPLING_TASK_ALLOC_IMPL_SRCS = src/RandomSamplingTaskAllocation.cpp src/RandomSamplingAlgo/RandomNode.cpp
+# Sampler budget study: one binary per sweep (their config factories collide)
+BUDGET_COMMON_SRCS = budget_study/budget_common.cpp
+BS_AUTOMATON_STATES_BIN = $(OUT_DIR)/BudgetAutomatonStates
+BS_AUTOMATON_STATES_SRCS = budget_study/budget_automaton_states.cpp budget_study/configs_automaton_states.cpp
+BS_NUMBER_ROBOTS_BIN = $(OUT_DIR)/BudgetNumberRobots
+BS_NUMBER_ROBOTS_SRCS = budget_study/budget_number_robots.cpp budget_study/configs_number_robots.cpp
+BS_TS_REGIONS_BIN = $(OUT_DIR)/BudgetTransitionSystemRegions
+BS_TS_REGIONS_SRCS = budget_study/budget_transition_system_regions.cpp budget_study/configs_transition_system_regions.cpp
+BS_AVG_CAPS_BIN = $(OUT_DIR)/BudgetAverageCapabilities
+BS_AVG_CAPS_SRCS = budget_study/budget_average_capabilities.cpp budget_study/configs_average_capabilities.cpp
+BS_ROBOT_HOMOGENEITY_BIN = $(OUT_DIR)/BudgetRobotHomogeneity
+BS_ROBOT_HOMOGENEITY_SRCS = budget_study/budget_robot_homogeneity.cpp budget_study/configs_robot_homogeneity.cpp
+# Showcase replay: re-plans the configurations one planner clearly won and draws both plans.
+# Same one-binary-per-sweep split, and the same config factories, as the budget study above.
+REPLAY_COMMON_SRCS = budget_study/replay_common.cpp
+RP_AUTOMATON_STATES_BIN = $(OUT_DIR)/ReplayAutomatonStates
+RP_AUTOMATON_STATES_SRCS = budget_study/replay_automaton_states.cpp budget_study/configs_automaton_states.cpp
+RP_NUMBER_ROBOTS_BIN = $(OUT_DIR)/ReplayNumberRobots
+RP_NUMBER_ROBOTS_SRCS = budget_study/replay_number_robots.cpp budget_study/configs_number_robots.cpp
+RP_TS_REGIONS_BIN = $(OUT_DIR)/ReplayTransitionSystemRegions
+RP_TS_REGIONS_SRCS = budget_study/replay_transition_system_regions.cpp budget_study/configs_transition_system_regions.cpp
+RP_AVG_CAPS_BIN = $(OUT_DIR)/ReplayAverageCapabilities
+RP_AVG_CAPS_SRCS = budget_study/replay_average_capabilities.cpp budget_study/configs_average_capabilities.cpp
+RP_ROBOT_HOMOGENEITY_BIN = $(OUT_DIR)/ReplayRobotHomogeneity
+RP_ROBOT_HOMOGENEITY_SRCS = budget_study/replay_robot_homogeneity.cpp budget_study/configs_robot_homogeneity.cpp
 
 COMMON_SRCS = \
 	src/Environment/Point.cpp \
@@ -85,15 +114,27 @@ AVG_CAPS_OBJ = $(AVG_CAPS_SRC:.cpp=.o)
 ROBOT_HOMOGENEITY_OBJ = $(ROBOT_HOMOGENEITY_SRC:.cpp=.o)
 SAMPLING_TASK_ALLOC_OBJ = $(SAMPLING_TASK_ALLOC_SRC:.cpp=.o)
 SAMPLING_TASK_ALLOC_IMPL_OBJS = $(SAMPLING_TASK_ALLOC_IMPL_SRCS:.cpp=.o)
+BUDGET_COMMON_OBJS = $(BUDGET_COMMON_SRCS:.cpp=.o)
+BS_AUTOMATON_STATES_OBJS = $(BS_AUTOMATON_STATES_SRCS:.cpp=.o)
+BS_NUMBER_ROBOTS_OBJS = $(BS_NUMBER_ROBOTS_SRCS:.cpp=.o)
+BS_TS_REGIONS_OBJS = $(BS_TS_REGIONS_SRCS:.cpp=.o)
+BS_AVG_CAPS_OBJS = $(BS_AVG_CAPS_SRCS:.cpp=.o)
+BS_ROBOT_HOMOGENEITY_OBJS = $(BS_ROBOT_HOMOGENEITY_SRCS:.cpp=.o)
+REPLAY_COMMON_OBJS = $(REPLAY_COMMON_SRCS:.cpp=.o)
+RP_AUTOMATON_STATES_OBJS = $(RP_AUTOMATON_STATES_SRCS:.cpp=.o)
+RP_NUMBER_ROBOTS_OBJS = $(RP_NUMBER_ROBOTS_SRCS:.cpp=.o)
+RP_TS_REGIONS_OBJS = $(RP_TS_REGIONS_SRCS:.cpp=.o)
+RP_AVG_CAPS_OBJS = $(RP_AVG_CAPS_SRCS:.cpp=.o)
+RP_ROBOT_HOMOGENEITY_OBJS = $(RP_ROBOT_HOMOGENEITY_SRCS:.cpp=.o)
 GRIDVIS_OBJ = $(GRIDVIS_SRC:.cpp=.o)
 COMMON_OBJS = $(COMMON_SRCS:.cpp=.o)
 TASK_ALLOC_OBJS = $(TASK_ALLOC_SRCS:.cpp=.o)
-ALL_OBJS = $(TEST_OBJ) $(TREE_TEST_OBJ) $(TASK_ALLOC_OBJ) $(PLANNING_TREE_TEST_OBJ) $(OPTIMAL_PATH_OBJ) $(DSTAR_OBJ) $(VIS_OBJ) $(INTERTASK_OBJ) $(MULTICAP_OBJ) $(AUTOMATON_STATES_OBJ) $(AUTOMATON_STATES_BATCH_OBJ) $(NUMBER_ROBOTS_OBJ) $(TS_REGIONS_OBJ) $(AVG_CAPS_OBJ) $(ROBOT_HOMOGENEITY_OBJ) $(SAMPLING_TASK_ALLOC_OBJ) $(SAMPLING_TASK_ALLOC_IMPL_OBJS) $(GRIDVIS_OBJ) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
+ALL_OBJS = $(TEST_OBJ) $(TREE_TEST_OBJ) $(TASK_ALLOC_OBJ) $(PLANNING_TREE_TEST_OBJ) $(OPTIMAL_PATH_OBJ) $(DSTAR_OBJ) $(VIS_OBJ) $(INTERTASK_OBJ) $(MULTICAP_OBJ) $(AUTOMATON_STATES_OBJ) $(AUTOMATON_STATES_BATCH_OBJ) $(NUMBER_ROBOTS_OBJ) $(TS_REGIONS_OBJ) $(AVG_CAPS_OBJ) $(ROBOT_HOMOGENEITY_OBJ) $(SAMPLING_TASK_ALLOC_OBJ) $(SAMPLING_TASK_ALLOC_IMPL_OBJS) $(BUDGET_COMMON_OBJS) $(BS_AUTOMATON_STATES_OBJS) $(BS_NUMBER_ROBOTS_OBJS) $(BS_TS_REGIONS_OBJS) $(BS_AVG_CAPS_OBJS) $(BS_ROBOT_HOMOGENEITY_OBJS) $(REPLAY_COMMON_OBJS) $(RP_AUTOMATON_STATES_OBJS) $(RP_NUMBER_ROBOTS_OBJS) $(RP_TS_REGIONS_OBJS) $(RP_AVG_CAPS_OBJS) $(RP_ROBOT_HOMOGENEITY_OBJS) $(GRIDVIS_OBJ) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
 
 # Targets
-.PHONY: all clean run rebuild help test test-tree test-task test-planning-tree test-optimal-path test-dstar test-intertask test-multicap test-automaton-states test-automaton-states-batch test-number-robots test-ts-regions test-average-capabilities test-robot-homogeneity test-sampling-task-alloc test-all tree-only task-only planning-tree-only optimal-path-only dstar-only intertask-only multicap-only automaton-states-only automaton-states-batch-only number-robots-only ts-regions-only average-capabilities-only robot-homogeneity-only sampling-task-alloc-only vis vis-only
+.PHONY: all clean run rebuild help test compare test-tree test-task test-planning-tree test-optimal-path test-dstar test-intertask test-multicap test-automaton-states test-automaton-states-batch test-number-robots test-ts-regions test-average-capabilities test-robot-homogeneity test-sampling-task-alloc test-all tree-only task-only planning-tree-only optimal-path-only dstar-only intertask-only multicap-only automaton-states-only automaton-states-batch-only number-robots-only ts-regions-only average-capabilities-only robot-homogeneity-only sampling-task-alloc-only vis vis-only budget-automaton-states budget-number-robots budget-ts-regions budget-average-capabilities budget-robot-homogeneity budget-study replay-automaton-states replay-number-robots replay-ts-regions replay-average-capabilities replay-robot-homogeneity showcase
 
-all: $(OUT_BIN) $(TREE_BIN) $(TASK_ALLOC_BIN) $(PLANNING_TREE_BIN) $(OPTIMAL_PATH_BIN) $(DSTAR_BIN) $(INTERTASK_BIN) $(MULTICAP_BIN) $(AUTOMATON_STATES_BIN) $(AUTOMATON_STATES_BATCH_BIN) $(NUMBER_ROBOTS_BIN) $(TS_REGIONS_BIN) $(AVG_CAPS_BIN) $(ROBOT_HOMOGENEITY_BIN) $(SAMPLING_TASK_ALLOC_BIN) $(VIS_BIN)
+all: $(OUT_BIN) $(TREE_BIN) $(TASK_ALLOC_BIN) $(PLANNING_TREE_BIN) $(OPTIMAL_PATH_BIN) $(DSTAR_BIN) $(INTERTASK_BIN) $(MULTICAP_BIN) $(AUTOMATON_STATES_BIN) $(AUTOMATON_STATES_BATCH_BIN) $(NUMBER_ROBOTS_BIN) $(TS_REGIONS_BIN) $(AVG_CAPS_BIN) $(ROBOT_HOMOGENEITY_BIN) $(SAMPLING_TASK_ALLOC_BIN) $(VIS_BIN) $(BS_AUTOMATON_STATES_BIN) $(BS_NUMBER_ROBOTS_BIN) $(BS_TS_REGIONS_BIN) $(BS_AVG_CAPS_BIN) $(BS_ROBOT_HOMOGENEITY_BIN) $(RP_AUTOMATON_STATES_BIN) $(RP_NUMBER_ROBOTS_BIN) $(RP_TS_REGIONS_BIN) $(RP_AVG_CAPS_BIN) $(RP_ROBOT_HOMOGENEITY_BIN)
 
 # Build the test executable
 $(OUT_BIN): $(TEST_OBJ) $(COMMON_OBJS)
@@ -144,37 +185,37 @@ $(MULTICAP_BIN): $(MULTICAP_OBJ) $(COMMON_OBJS) $(TASK_ALLOC_OBJS) $(GRIDVIS_OBJ
 	@echo "✓ Build successful: $(MULTICAP_BIN)"
 
 # Build the automaton states scaling tests executable
-$(AUTOMATON_STATES_BIN): $(AUTOMATON_STATES_OBJ) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
+$(AUTOMATON_STATES_BIN): $(AUTOMATON_STATES_OBJ) $(SAMPLING_TASK_ALLOC_IMPL_OBJS) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
 	@mkdir -p $(OUT_DIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $^ -o $@ $(LIBS)
 	@echo "✓ Build successful: $(AUTOMATON_STATES_BIN)"
 
 # Build the automaton states batch scaling tests executable
-$(AUTOMATON_STATES_BATCH_BIN): $(AUTOMATON_STATES_BATCH_OBJ) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
+$(AUTOMATON_STATES_BATCH_BIN): $(AUTOMATON_STATES_BATCH_OBJ) $(SAMPLING_TASK_ALLOC_IMPL_OBJS) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
 	@mkdir -p $(OUT_DIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $^ -o $@ $(LIBS)
 	@echo "✓ Build successful: $(AUTOMATON_STATES_BATCH_BIN)"
 
 # Build the number robots scaling tests executable
-$(NUMBER_ROBOTS_BIN): $(NUMBER_ROBOTS_OBJ) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
+$(NUMBER_ROBOTS_BIN): $(NUMBER_ROBOTS_OBJ) $(SAMPLING_TASK_ALLOC_IMPL_OBJS) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
 	@mkdir -p $(OUT_DIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $^ -o $@ $(LIBS)
 	@echo "✓ Build successful: $(NUMBER_ROBOTS_BIN)"
 
 # Build the transition system regions scaling tests executable
-$(TS_REGIONS_BIN): $(TS_REGIONS_OBJ) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
+$(TS_REGIONS_BIN): $(TS_REGIONS_OBJ) $(SAMPLING_TASK_ALLOC_IMPL_OBJS) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
 	@mkdir -p $(OUT_DIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $^ -o $@ $(LIBS)
 	@echo "✓ Build successful: $(TS_REGIONS_BIN)"
 
 # Build the average capabilities scaling tests executable
-$(AVG_CAPS_BIN): $(AVG_CAPS_OBJ) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
+$(AVG_CAPS_BIN): $(AVG_CAPS_OBJ) $(SAMPLING_TASK_ALLOC_IMPL_OBJS) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
 	@mkdir -p $(OUT_DIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $^ -o $@ $(LIBS)
 	@echo "✓ Build successful: $(AVG_CAPS_BIN)"
 
 # Build the robot homogeneity scaling tests executable
-$(ROBOT_HOMOGENEITY_BIN): $(ROBOT_HOMOGENEITY_OBJ) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
+$(ROBOT_HOMOGENEITY_BIN): $(ROBOT_HOMOGENEITY_OBJ) $(SAMPLING_TASK_ALLOC_IMPL_OBJS) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
 	@mkdir -p $(OUT_DIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $^ -o $@ $(LIBS)
 	@echo "✓ Build successful: $(ROBOT_HOMOGENEITY_BIN)"
@@ -190,6 +231,10 @@ $(VIS_BIN): $(VIS_OBJ) $(GRIDVIS_OBJ) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
 	@mkdir -p $(OUT_DIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $^ -o $@ $(LIBS) $(RAYLIB_FLAGS)
 	@echo "✓ Build successful: $(VIS_BIN)"
+
+# Header dependencies recorded by -MMD. Without these, changing a header leaves stale
+# objects that disagree with the rest of the build about class layouts.
+-include $(ALL_OBJS:.o=.d)
 
 # Compile object files
 %.o: %.cpp
@@ -324,6 +369,11 @@ vis-only: $(VIS_BIN)
 # Run all tests
 test-all: test-tree test-task test-planning-tree test-optimal-path test-dstar test-intertask test-multicap test-automaton-states test-automaton-states-batch test-number-robots test-ts-regions test-average-capabilities test-robot-homogeneity
 
+# Run every sweep, then build the cross-model comparison figures from their combined CSVs
+compare: test-automaton-states test-automaton-states-batch test-number-robots test-ts-regions test-average-capabilities test-robot-homogeneity
+	@echo "Building cross-model comparison..."
+	@cd organizedtests && python3 plot_model_comparison.py
+
 # Run tests and show output
 test: test-all
 
@@ -332,9 +382,119 @@ rebuild: clean all
 	@echo "✓ Rebuild complete"
 
 # Clean build artifacts
+# ---------------------------------------------------------------------------
+# Sampler budget study: runs ONLY the sampler, at 5/20/40/70/100x the tree planner's
+# recorded runtime. The tree is never re-run; its timings come from the sweep CSVs,
+# so these binaries require the matching organizedtests sweep to have been run first.
+# ---------------------------------------------------------------------------
+
+$(BS_AUTOMATON_STATES_BIN): $(BS_AUTOMATON_STATES_OBJS) $(BUDGET_COMMON_OBJS) $(SAMPLING_TASK_ALLOC_IMPL_OBJS) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
+	@mkdir -p $(OUT_DIR)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $^ -o $@ $(LIBS)
+	@echo "✓ Build successful: $(BS_AUTOMATON_STATES_BIN)"
+
+budget-automaton-states: $(BS_AUTOMATON_STATES_BIN)
+	@echo "Running the sampler budget study for automaton_states..."
+	@cd budget_study && ../$(BS_AUTOMATON_STATES_BIN) --trials=$(BUDGET_TRIALS) $(BUDGET_APPEND)
+
+$(BS_NUMBER_ROBOTS_BIN): $(BS_NUMBER_ROBOTS_OBJS) $(BUDGET_COMMON_OBJS) $(SAMPLING_TASK_ALLOC_IMPL_OBJS) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
+	@mkdir -p $(OUT_DIR)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $^ -o $@ $(LIBS)
+	@echo "✓ Build successful: $(BS_NUMBER_ROBOTS_BIN)"
+
+budget-number-robots: $(BS_NUMBER_ROBOTS_BIN)
+	@echo "Running the sampler budget study for number_robots..."
+	@cd budget_study && ../$(BS_NUMBER_ROBOTS_BIN) --trials=$(BUDGET_TRIALS) $(BUDGET_APPEND)
+
+$(BS_TS_REGIONS_BIN): $(BS_TS_REGIONS_OBJS) $(BUDGET_COMMON_OBJS) $(SAMPLING_TASK_ALLOC_IMPL_OBJS) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
+	@mkdir -p $(OUT_DIR)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $^ -o $@ $(LIBS)
+	@echo "✓ Build successful: $(BS_TS_REGIONS_BIN)"
+
+budget-ts-regions: $(BS_TS_REGIONS_BIN)
+	@echo "Running the sampler budget study for transition_system_regions..."
+	@cd budget_study && ../$(BS_TS_REGIONS_BIN) --trials=$(BUDGET_TRIALS) $(BUDGET_APPEND)
+
+$(BS_AVG_CAPS_BIN): $(BS_AVG_CAPS_OBJS) $(BUDGET_COMMON_OBJS) $(SAMPLING_TASK_ALLOC_IMPL_OBJS) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
+	@mkdir -p $(OUT_DIR)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $^ -o $@ $(LIBS)
+	@echo "✓ Build successful: $(BS_AVG_CAPS_BIN)"
+
+budget-average-capabilities: $(BS_AVG_CAPS_BIN)
+	@echo "Running the sampler budget study for average_capabilities..."
+	@cd budget_study && ../$(BS_AVG_CAPS_BIN) --trials=$(BUDGET_TRIALS) $(BUDGET_APPEND)
+
+$(BS_ROBOT_HOMOGENEITY_BIN): $(BS_ROBOT_HOMOGENEITY_OBJS) $(BUDGET_COMMON_OBJS) $(SAMPLING_TASK_ALLOC_IMPL_OBJS) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
+	@mkdir -p $(OUT_DIR)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $^ -o $@ $(LIBS)
+	@echo "✓ Build successful: $(BS_ROBOT_HOMOGENEITY_BIN)"
+
+budget-robot-homogeneity: $(BS_ROBOT_HOMOGENEITY_BIN)
+	@echo "Running the sampler budget study for robot_homogeneity..."
+	@cd budget_study && ../$(BS_ROBOT_HOMOGENEITY_BIN) --trials=$(BUDGET_TRIALS) $(BUDGET_APPEND)
+
+budget-study: budget-automaton-states budget-number-robots budget-ts-regions budget-average-capabilities budget-robot-homogeneity
+	@echo "All budget studies complete. Plot with: cd budget_study && python3 plot_budget_study.py"
+
+# ---------------------------------------------------------------------------
+# Showcase replay: re-plans the configurations one planner clearly won, with BOTH planners,
+# and draws both plans. The budget study throws its planners away, so the plans have to be
+# rebuilt to be looked at. Needs budget_study/data/showcase_targets.csv, which
+# select_showcase.py writes from the study CSVs.
+# ---------------------------------------------------------------------------
+
+$(RP_AUTOMATON_STATES_BIN): $(RP_AUTOMATON_STATES_OBJS) $(REPLAY_COMMON_OBJS) $(SAMPLING_TASK_ALLOC_IMPL_OBJS) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
+	@mkdir -p $(OUT_DIR)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $^ -o $@ $(LIBS)
+	@echo "✓ Build successful: $(RP_AUTOMATON_STATES_BIN)"
+
+replay-automaton-states: $(RP_AUTOMATON_STATES_BIN)
+	@echo "Replaying the showcased automaton_states configurations..."
+	@cd budget_study && ../$(RP_AUTOMATON_STATES_BIN)
+
+$(RP_NUMBER_ROBOTS_BIN): $(RP_NUMBER_ROBOTS_OBJS) $(REPLAY_COMMON_OBJS) $(SAMPLING_TASK_ALLOC_IMPL_OBJS) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
+	@mkdir -p $(OUT_DIR)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $^ -o $@ $(LIBS)
+	@echo "✓ Build successful: $(RP_NUMBER_ROBOTS_BIN)"
+
+replay-number-robots: $(RP_NUMBER_ROBOTS_BIN)
+	@echo "Replaying the showcased number_robots configurations..."
+	@cd budget_study && ../$(RP_NUMBER_ROBOTS_BIN)
+
+$(RP_TS_REGIONS_BIN): $(RP_TS_REGIONS_OBJS) $(REPLAY_COMMON_OBJS) $(SAMPLING_TASK_ALLOC_IMPL_OBJS) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
+	@mkdir -p $(OUT_DIR)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $^ -o $@ $(LIBS)
+	@echo "✓ Build successful: $(RP_TS_REGIONS_BIN)"
+
+replay-ts-regions: $(RP_TS_REGIONS_BIN)
+	@echo "Replaying the showcased transition_system_regions configurations..."
+	@cd budget_study && ../$(RP_TS_REGIONS_BIN)
+
+$(RP_AVG_CAPS_BIN): $(RP_AVG_CAPS_OBJS) $(REPLAY_COMMON_OBJS) $(SAMPLING_TASK_ALLOC_IMPL_OBJS) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
+	@mkdir -p $(OUT_DIR)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $^ -o $@ $(LIBS)
+	@echo "✓ Build successful: $(RP_AVG_CAPS_BIN)"
+
+replay-average-capabilities: $(RP_AVG_CAPS_BIN)
+	@echo "Replaying the showcased average_capabilities configurations..."
+	@cd budget_study && ../$(RP_AVG_CAPS_BIN)
+
+$(RP_ROBOT_HOMOGENEITY_BIN): $(RP_ROBOT_HOMOGENEITY_OBJS) $(REPLAY_COMMON_OBJS) $(SAMPLING_TASK_ALLOC_IMPL_OBJS) $(COMMON_OBJS) $(TASK_ALLOC_OBJS)
+	@mkdir -p $(OUT_DIR)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $^ -o $@ $(LIBS)
+	@echo "✓ Build successful: $(RP_ROBOT_HOMOGENEITY_BIN)"
+
+replay-robot-homogeneity: $(RP_ROBOT_HOMOGENEITY_BIN)
+	@echo "Replaying the showcased robot_homogeneity configurations..."
+	@cd budget_study && ../$(RP_ROBOT_HOMOGENEITY_BIN)
+
+showcase: replay-automaton-states replay-number-robots replay-ts-regions replay-average-capabilities replay-robot-homogeneity
+	@cd budget_study && python3 plot_win_regimes.py && python3 build_showcase.py
+
 clean:
 	@echo "Cleaning build artifacts..."
 	@rm -f $(ALL_OBJS)
+	@rm -f $(ALL_OBJS:.o=.d)
 	@rm -f $(OUT_BIN)
 	@echo "✓ Cleaned"
 

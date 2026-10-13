@@ -6,6 +6,7 @@
 #include "../MultiRobotSystem/MultiRobotSystem.h"
 #include <vector>
 #include <map>
+#include <string>
 #include "../Tree/Tree_Node.h"
 
 /**
@@ -13,6 +14,17 @@
  * Maps: robotId -> vector of points representing D* path
  */
 using RobotPathMap = std::map<uint32_t, std::vector<Point>>;
+
+/**
+ * Stores the synchronization barriers along each robot's concrete path
+ * Maps: robotId -> vector of (optimal-path step index, index into that robot's path
+ * where the step's segment ends)
+ *
+ * The planner already holds every robot allocated to a step to one common arrival time,
+ * so a robot that reaches a task location waits there until every other robot allocated
+ * to the same step has arrived before any of them move on.
+ */
+using RobotBarrierMap = std::map<uint32_t, std::vector<std::pair<size_t, size_t>>>;
 
 /**
  * Visualizes the environment grid with TS state regions, obstacles, robots, and optimal path
@@ -36,11 +48,15 @@ using RobotPathMap = std::map<uint32_t, std::vector<Point>>;
  * For each node in the path and each robot allocated to that node:
  * - Runs D* Lite from robot's current position to the TS state goal
  * - Concatenates all paths to build complete trajectories
+ *
+ * If barriers is non-null it is filled with the per-step synchronization points for each
+ * robot, which visualize_environment uses to keep an allocated group moving together.
  */
 RobotPathMap compute_dstar_paths(
     const Environment& env,
     const MultiRobotSystem& mrs,
-    const std::vector<Tree_Node*>& optimalPath
+    const std::vector<Tree_Node*>& optimalPath,
+    RobotBarrierMap* barriers = nullptr
 );
 
 /**
@@ -66,7 +82,9 @@ void visualize_environment(
     const MultiRobotSystem& mrs,
     const std::vector<Tree_Node*>& optimalPath,
     const RobotPathMap& robotPaths = RobotPathMap(),
-    const char* windowTitle = "Multi-Robot Task Planner"
+    const char* windowTitle = "Multi-Robot Task Planner",
+    const std::string& snapshotDirectory = "",
+    const RobotBarrierMap& robotBarriers = RobotBarrierMap()
 );
 
 #endif // GRID_VIS_H

@@ -85,6 +85,9 @@ public:
     
     // Export separate CSV for each input configuration
     void exportByConfiguration(const std::string& output_dir = "data", const std::string& independent_var = "automaton_id") const;
+
+    // One row per (run, method) for comparing the planners against each other
+    void exportCombinedCSV(const std::string& output_filename = "data/combined_long.csv") const;
     
     // Export aggregated statistics
     void exportStatisticsToCSV(const std::string& output_filename) const;
